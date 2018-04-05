@@ -1,11 +1,12 @@
-20131612 : reader.o process.o
-	gcc -o 20131612 reader.o process.o
+CC = gcc
+CFAGS = -W -Wall
+TARGET = 20131612
+OBJECTS = reader.o process.o
 
-reader.o : reader.c
-	gcc -c -o reader.o reader.c
+all : $(TARGET)
 
-process.o : process.c
-	gcc -c -o process.o process.c
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean :
 	rm *.o 20131612
