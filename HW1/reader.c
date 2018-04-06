@@ -15,7 +15,7 @@
 //#include <sys/shm.h>
 
 #define BUFF_SIZE 64
-#define MAX_BUTTON 9
+//#define MAX_BUTTON 9
 
 #define KEY_PRESS 1
 #define KEY_RELEASE 0
@@ -65,8 +65,8 @@ void readFromDevice(int* shmaddr){
 
     /* sw button */
     read(swButtonDesc, &push_sw_buff, swBuffSize);
-    for( i=1; i<MAX_BUTTON; i++)
-      shmaddr[i] = push_sw_buff[i];
+    for( i=1; i<1+MAX_BUTTON; i++)
+      shmaddr[i] = push_sw_buff[i-1];
   }
   close(readKeyDesc);
   close(swButtonDesc);
