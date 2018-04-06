@@ -1,5 +1,5 @@
-CC = gcc
-CFAGS = -W -Wall
+CC = arm-none-linux-gnueabi-gcc
+CFAGS = --static -o -W -Wall
 TARGET = 20131612
 OBJECTS = reader.o process.o
 

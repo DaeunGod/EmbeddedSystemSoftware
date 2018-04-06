@@ -1,13 +1,28 @@
 #include "reader.h"
 #include <linux/input.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <termios.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/select.h>
+#include <fcntl.h>
+#include <dirent.h>
+//#include <sys/ipc.h>
+//#include <sys/shm.h>
 
 #define BUFF_SIZE 64
 #define MAX_BUTTON 9
 
+#define KEY_PRESS 1
+#define KEY_RELEASE 0
+
 unsigned char quit = 0;
 
-void user_signal(int sig){
+void user_signal1(int sig){
   quit = 1;
 }
 
