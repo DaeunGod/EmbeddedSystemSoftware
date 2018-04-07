@@ -2,7 +2,7 @@
 #define __WRITER_H_
 
 
-void readFromSM(int* shmaddr);
+void readFromSM(int* shmaddr, int *mode, int* isChange);
 void FNDmode1();
 void LCD();
 void LED(int n);

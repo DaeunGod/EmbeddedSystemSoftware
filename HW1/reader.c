@@ -57,7 +57,7 @@ int main(int argc, char* argv[]){
 
   (void)signal(SIGINT, user_signal1);
 
-  while(!quit){
+  while(1){
     int i;
     int rd, swBuffSize = sizeof(push_sw_buff);
 
