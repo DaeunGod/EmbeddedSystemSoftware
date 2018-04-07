@@ -14,14 +14,8 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
-//#include <sys/ipc.h>
-//#include <sys/shm.h>
 
 #define BUFF_SIZE 64
-//#define MAX_BUTTON 9
-
-//#define KEY_PRESS 1
-//#define KEY_RELEASE 0
 
 unsigned char quit = 0;
 
@@ -29,7 +23,6 @@ void user_signal1(int sig){
   quit = 1;
 }
 
-//void readFromDevice(int* shmaddr){
 int main(int argc, char* argv[]){
   struct input_event ev[BUFF_SIZE];
   int readKeyDesc, swButtonDesc;

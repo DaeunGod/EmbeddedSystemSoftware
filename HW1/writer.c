@@ -11,6 +11,7 @@
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include "fpga_dot_font.h"
 
 #define FPGA_BASE_ADDRESS 0x08000000
 #define LED_ADDR 0x16
@@ -18,16 +19,17 @@
 unsigned char fndData[4];
 unsigned char string[32];
 
-void readFromSM(int* shmaddr, int *mode, int* isChange){
+void readFromSM(int* shmaddr, int *mode, int *ledstat, int *dotMat){
 	int i;
 	*mode = shmaddr[10];
-	*isChange = shmaddr[11];
+	*ledstat = shmaddr[11];
 	for(i=0; i<4; i++){
 		fndData[i] = shmaddr[12+i];
 	}
 	for(i=0; i<32; i++){
 		string[i] = shmaddr[16+i];
 	}
+	*dotMat = shmaddr[48];
 }
 
 void FNDmode1(){
@@ -41,7 +43,6 @@ void FNDmode1(){
 		exit(1);
 	}
 
-	//printf("%d %d %d %d\n", fndData[0], fndData[1], fndData[2], fndData[3]);
 	retval = write(dev, &fndData, 4);
 	if( retval < 0 ){
 		perror("FND write error'");
@@ -49,7 +50,6 @@ void FNDmode1(){
 	}
 
 	close(dev);
-	//tm_ptr->tm_hour, tm_ptr->tm_min
 }
 
 void LCD(){
@@ -97,21 +97,41 @@ void LED(int n){
 	close(fd);
 }
 
+void Dot(int dotMatrix){
+	int dev = open("/dev/fpga_dot", O_WRONLY);
+	int size;
+	if( dev < 0 ){
+		perror("Dot Matrix");
+		close(dev);
+		return ;
+	}
+	
+
+	//size = sizeof(fpga_number[dotMatrix]);
+	if( dotMatrix == -1 )
+		write(dev, fpga_set_blank, sizeof(fpga_set_blank));
+	else{
+		size = sizeof(fpga_number[dotMatrix]);
+		write(dev, fpga_number[dotMatrix], size);
+	}
+
+	close(dev);
+}
+
 int main(int argc, char* argv[]){
   key_t key;
   int shmid = atoi(argv[1]);
   int *shmaddr = NULL;
-	int mode=0, ledstat=0;
+	int mode=0, ledstat=0, dotMatrix;
 
   shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
-	//if( mode == 1 ){
-	readFromSM(shmaddr, &mode, &ledstat); // Initialize
+	readFromSM(shmaddr, &mode, &ledstat, &dotMatrix); // Initialize
 	LCD();
 	LED(128);
+	Dot(-1);
 	while(1){
-   	//usleep(400000);
 		FNDmode1();
-		readFromSM(shmaddr, &mode, &ledstat);
+		readFromSM(shmaddr, &mode, &ledstat, &dotMatrix);
 
 		if( mode == 1 ){
 			if( ledstat == 1 ){
@@ -134,7 +154,9 @@ int main(int argc, char* argv[]){
 			else
 				LED(128);
 		}
+		else if( mode == 3 ){
+			Dot(dotMatrix);
+		}
 	}
-	//}
 	return 0;
 }

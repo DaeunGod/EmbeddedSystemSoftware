@@ -10,10 +10,6 @@
 
 #include <time.h>
 
-/*void FNDmode1(unsigned char *data){
-	int dev = open(
-	//tm_ptr->tm_hour, tm_ptr->tm_min
-}*/
 #define MAX_BUTTON 9
 #define KEY_PRESS 1
 #define KEY_RELEASE 0
@@ -22,9 +18,10 @@
 #define STR_START 16
 int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData);
 void mode2swbutton(int* swbutton, unsigned char* fndData, int *number);
-void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat);
+void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix);
 void mode1Init(struct tm **tm_ptr);
 void mode2Init(unsigned char *fndData);
+void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt);
 
 int main(){
   int inputProcId, outputProcId;
@@ -36,7 +33,6 @@ int main(){
   key = ftok("/data", 1);
   shmid = shmget(key, 1024, IPC_CREAT|0644);
 	sprintf(shmidChar, "%d", shmid);
-	//itoa(shmid, shmidChar, 256);
   if( shmid == -1 ){
     perror("shmget");
     exit(1);
@@ -57,22 +53,20 @@ int main(){
 
 		unsigned char fndData[4]={0};
 		unsigned char string[32] = {"Hello           World          "};
+		int strIndex = 0;
 		int i;
-		int ledstat=0;
+		int ledstat=0, dotMatrix=0;
+		
 
 		mode1Init(&tm_ptr);
-		//fndData[0] = tm_ptr->tm_hour/10; fndData[1] = (tm_ptr->tm_hour)%10;
-		//fndData[2] = tm_ptr->tm_min/10; fndData[3] = (tm_ptr->tm_min)%10;
-
-		//printf("%d %d %d %d\n", fndData[0], fndData[1], fndData[2], fndData[3]);
 
     shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
-		for(i=0; i<4; i++){
+		/*for(i=0; i<4; i++){
 			shmaddr[ FND_START +i] = fndData[i];
 		}
 		for(i=0; i<32; i++){
 			shmaddr[ STR_START +i] = string[i];
-		}
+		}*/
 
 
     if( (outputProcId = fork()) < 0 ){
@@ -92,10 +86,7 @@ int main(){
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
 
-			printf("press %d %d %d ", pressedKey, mode, ledstat);
-			//for(i=0; i<MAX_BUTTON; i++)
-				//printf("%d ", swbutton[i]);
-			printf("\n");
+			printf("press %d %d %d\n ", pressedKey, mode, ledstat);
       if( pressedKey == 158 ){
 				/* Quit */
         break;
@@ -105,37 +96,40 @@ int main(){
       else if( pressedKey == 115 ){
 				/* Mode Change + */
 				mode = (mode+1)%4;
-				modesInit(mode, tm_ptr, fndData, &ledstat);
+				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
       }
       else if( pressedKey == 114 ){
 				/* Mode Change - */
 				mode--;
 				if( mode < 0 )
 					mode =  4;
-				modesInit(mode, tm_ptr, fndData, &ledstat);
+				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
       }
 
 			if( mode == 1 ){
 				ledstat = mode1swbutton(swbutton, tm_ptr, fndData);
-				//shmaddr[11] = isChange;
-				//shmaddr[10] = isChange;
-				/*for(i=0; i<4; i++){
-					shmaddr[11+i] = fndData[i];
-				}*/
 			}
 			else if( mode == 2 ){
 				mode2swbutton(swbutton, fndData, &ledstat);
 			}
+			else if( mode == 3 ){
+				mode3swbutton(swbutton, string, &strIndex, &dotMatrix, &ledstat);
+			}
+
 			shmaddr[10] = mode;
 			shmaddr[11] = ledstat;
 			for(i=0; i<4; i++){
 				shmaddr[ FND_START +i] = fndData[i];
 			}
+			for(i=0; i<32; i++){
+				shmaddr[ STR_START +i] = string[i];
+			}
+			shmaddr[48] = dotMatrix;
     }
 
     //prctl(PR_SET_PDEATHSIG, SIGTERM);
-		//kill(inputProcId, SIGTERM);
-		//kill(outputProcId, SIGTERM);
+		kill(inputProcId, SIGTERM);
+		kill(outputProcId, SIGTERM);
 
     /* waiting for running child*/
     while( (processingChild = wait(&status)) > 0 );
@@ -154,8 +148,6 @@ int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData){
 
 	if( isChange == 1 ){
 		if( swbutton[1] == KEY_PRESS ){
-			//time_t the_time = time(NULL);
-			//tm_ptr = localtime(&the_time);
 			mode1Init(&tm_ptr);
 		}
 		if( swbutton[2] == KEY_PRESS ){
@@ -179,7 +171,6 @@ int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData){
 void mode1Init(struct tm **tm_ptr){
 	time_t t = time(NULL);
 	*tm_ptr = localtime(&t);
-	//printf("t: %d %d\n", tm_ptr->tm_hour, tm_ptr->tm_min);
 }
 
 void mode2swbutton(int* swbutton, unsigned char* fndData, int *number){
@@ -236,12 +227,77 @@ void mode2Init(unsigned char *fndData){
 	memset(fndData, 0, sizeof(unsigned char)*4);
 }
 
-void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat){
+void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix){
 	*ledstat = 0;
+	memset(fndData, 0, sizeof(unsigned char)*4);
 	if( mode == 1)
 		mode1Init(&tm_ptr);
 	else if( mode == 2 ){
-		mode2Init(fndData);
+		//mode2Init(fndData);
 		*ledstat = 10;
 	}
+	else if( mode == 3 ){
+		*dotMatrix = 1;
+	}
+}
+
+void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt){
+	int index1=-1, index2=-1;
+	int i;
+	static int clickCnt = 0;
+	static int clickedBefore = -1;
+
+	char charTable[9][3] = 
+	{{'.','Q','Z'}, {'A', 'B', 'C'}, {'D', 'E', 'F'},
+		{'G','H','I'}, {'J','K','L'}, {'M','N','O'},
+		{'P','R','S'}, {'T','U','V'}, {'W','X','Y'}};
+
+	for(i=0; i<9; i++){
+		if( swbutton[i] != 0 ){
+			if( index1 == -1 )
+				index1 = i;
+			else
+				index2 = i;
+		}
+	}
+
+	//printf("ins1 %d ins2 %d\n", index1, index2);
+
+	if( index1 == 1 && index2 == 2 ){
+		/* pressed sw(2), sw(3) */
+		/* clear string					*/
+	}
+	else if( index1 == 4 && index2 == 5 ){
+		/* pressed sw(5), sw(6) */
+		/* change input mode, character or number */
+		if( *dotMatrix == 1 )
+		 	*dotMatrix = 10;
+		else
+			*dotMatrix = 1;
+	}
+	else if( index1 == 7 && index2 == 8 ){
+		/* pressed sw(8), sw(9) */
+		/* make space 					*/
+	}
+	else{
+		if( index1 != -1 ){
+			char c;
+
+			if( index1 != clickedBefore ){
+				clickedBefore = index1;
+			}
+			else {
+				clickCnt++;
+				clickCnt = clickCnt % 3;
+			}
+		
+			c	= charTable[index1][clickCnt];
+			string[*strIndex] = c;
+			(*cnt)++;
+			(*strIndex)++;
+		}
+	}
+
+
+
 }
