@@ -11,6 +11,9 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
 //#include <sys/ipc.h>
 //#include <sys/shm.h>
 
@@ -26,7 +29,8 @@ void user_signal1(int sig){
   quit = 1;
 }
 
-void readFromDevice(int* shmaddr){
+//void readFromDevice(int* shmaddr){
+int main(int argc, char* argv[]){
   struct input_event ev[BUFF_SIZE];
   int readKeyDesc, swButtonDesc;
   int size = sizeof(struct input_event);
@@ -35,6 +39,10 @@ void readFromDevice(int* shmaddr){
 
   char *readKeyDevice = "/dev/input/event0";
   char *swButtonDevice = "/dev/fpga_push_switch";
+  int shmid = atoi(argv[1]);
+  int *shmaddr = NULL;
+
+  shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 
   if( (readKeyDesc = open(readKeyDevice, O_RDONLY | O_NONBLOCK)) < 0 ){
     close(readKeyDesc);
@@ -70,4 +78,6 @@ void readFromDevice(int* shmaddr){
   }
   close(readKeyDesc);
   close(swButtonDesc);
+
+	return 0;
 }

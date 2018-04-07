@@ -9,14 +9,14 @@
 #include <signal.h>
 
 #include <time.h>
-#include "reader.h"
-#include "writer.h"
 
 /*void FNDmode1(unsigned char *data){
 	int dev = open(
 	//tm_ptr->tm_hour, tm_ptr->tm_min
 }*/
-
+#define MAX_BUTTON 9
+#define KEY_PRESS 1
+#define KEY_RELEASE 0
 void mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData);
 void mode2swbutton(int* swbutton, unsigned char* fndData, int number);
 void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData);
@@ -28,9 +28,12 @@ int main(){
   key_t key;
   int shmid;
   int *shmaddr = NULL;
+	char shmidChar[256];
 
   key = ftok("/data", 1);
   shmid = shmget(key, 1024, IPC_CREAT|0644);
+	sprintf(shmidChar, "%d", shmid);
+	//itoa(shmid, shmidChar, 256);
   if( shmid == -1 ){
     perror("shmget");
     exit(1);
@@ -41,8 +44,8 @@ int main(){
     exit(1);
   }
   else if( inputProcId == 0 ){ /* -MARK: input Process */
-    shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
-    readFromDevice(shmaddr);
+		char *argv[] = {"./reader", shmidChar, NULL};
+		execv(argv[0], argv);
   }
   else{
     int processingChild, status;
@@ -57,7 +60,7 @@ int main(){
 		fndData[0] = tm_ptr->tm_hour/10; fndData[1] = (tm_ptr->tm_hour)%10;
 		fndData[2] = tm_ptr->tm_min/10; fndData[3] = (tm_ptr->tm_min)%10;
 
-		printf("%d %d %d %d\n", fndData[0], fndData[1], fndData[2], fndData[3]);
+		//printf("%d %d %d %d\n", fndData[0], fndData[1], fndData[2], fndData[3]);
 
     shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 		for(i=0; i<4; i++){
@@ -73,7 +76,9 @@ int main(){
       exit(1);
     }
     else if( outputProcId == 0 ){ /* -MARK: output Process */
-			if( mode == 1 ){
+			char *argv[] = {"./writer", shmidChar, NULL};
+			execv(argv[0], argv);
+			/*if( mode == 1 ){
     		shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 				readFromSM(shmaddr);
 				LCD();
@@ -82,7 +87,7 @@ int main(){
 					FNDmode1();
 					readFromSM(shmaddr);
 				}
-			}
+			}*/
     }
 
 		/* -MARK: main Process */
@@ -94,6 +99,10 @@ int main(){
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
 
+			printf("press %d ", pressedKey);
+			for(i=0; i<MAX_BUTTON; i++)
+				printf("%d ", swbutton[i]);
+			printf("\n");
       if( pressedKey == 158 ){
 				/* Quit */
         break;
@@ -130,8 +139,10 @@ int main(){
 
     /* waiting for running child*/
     while( (processingChild = wait(&status)) > 0 );
-  } 
-  return 0;
+  }
+	shmdt((int*)shmaddr);
+	shmctl(shmid, IPC_RMID, (struct shmid_ds*)NULL);
+	return 0;
 }
 
 

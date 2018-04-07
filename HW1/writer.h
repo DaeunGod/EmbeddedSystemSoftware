@@ -5,5 +5,6 @@
 void readFromSM(int* shmaddr);
 void FNDmode1();
 void LCD();
+void LED(int n);
 
 #endif

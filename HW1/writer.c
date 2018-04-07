@@ -7,6 +7,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+
+#define FPGA_BASE_ADDRESS 0x08000000
+#define LED_ADDR 0x16
 
 unsigned char fndData[4];
 unsigned char string[32];
@@ -50,4 +56,36 @@ void LCD(){
 	write(dev, string, 32);
 	close(dev);
 	memset(string, 0, sizeof(string));
+}
+
+void LED(int n){
+	int fd;
+	if( n < 0 || n > 255 ){
+		printf("LED data error\n");
+		return ;
+	}
+
+	fd = open("/dev/mem", O_RDWR | O_SYNC);
+	if( fd < 0 ){
+	}
+
+
+}
+
+int main(int argc, char* argv[]){
+  key_t key;
+  int shmid = atoi(argv[1]);
+  int *shmaddr = NULL;
+
+  shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
+	//if( mode == 1 ){
+	readFromSM(shmaddr);
+	LCD();
+	while(1){
+   	//usleep(400000);
+		FNDmode1();
+		readFromSM(shmaddr);
+	}
+	//}
+	return 0;
 }
