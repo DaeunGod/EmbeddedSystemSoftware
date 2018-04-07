@@ -56,10 +56,15 @@ void LCD(){
 	char *lcdFile = "/dev/fpga_text_lcd";
 	int dev = open(lcdFile, O_WRONLY);
 
+  if( dev < 0 ){
+    perror("LCD open error");
+    close(dev);
+    exit(1);
+  }
 	printf("%s\n", string);
 	write(dev, string, 32);
 	close(dev);
-	memset(string, 0, sizeof(string));
+	//memset(string, 0, sizeof(string));
 }
 
 void LED(int n){

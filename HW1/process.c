@@ -16,10 +16,59 @@
 
 #define FND_START 12
 #define STR_START 16
+
+/* name: mode1swbutton
+ * return: time editing flag, false or true
+ * param
+ *  swbutton: information of sw button pressed 
+ *  tm_ptr: structure that contains current time information 
+ *  fndData: data that show on the FND
+ * desc
+ *  if swbutton[0] == 1: flip time editing flag
+ *  if time editing flag == 1:
+ *    if swbutton[1] == 1: reset time that local
+ *    if swbutton[2] == 1: increase 1 hour
+ *    if swbutton[3] == 1: increase 1 min
+ *                                                */
 int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData);
+
+/* name: mode2swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  fndData: data that show on the FND
+ *  number: one of 10, 8, 4, 2
+ * desc
+ *  if swbutton[0] == 1: change a number into decimal, octal, quaternion, binary
+ *  if swbutton[1] == 1: increase hundred digits
+ *  if swbutton[2] == 1: increase ten digits
+ *  if swbutton[3] == 1: increase one digits
+ *                                            */
 void mode2swbutton(int* swbutton, unsigned char* fndData, int *number);
+
+/* name: modesInit
+ * return: none
+ * param
+ *  mode: current mode 
+ *  others: variables that need to initialize
+ * desc: initialize the variables according to the mode
+ *                                                    */
 void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix);
+
+/* name: mode1Init
+ * return: none
+ * param
+ *  tm_ptr: curent time 
+ * desc: initialize the tm_ptr into local time
+ *                                            */
 void mode1Init(struct tm **tm_ptr);
+
+/* name: mode2Init
+ * return: none
+ * param
+ *  fndData:  
+ * desc: initialize the fndData into 0
+ *                                            */
 void mode2Init(unsigned char *fndData);
 void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt);
 
@@ -30,6 +79,7 @@ int main(){
   int *shmaddr = NULL;
 	char shmidChar[256];
 
+  /* make a key to create shared memory */
   key = ftok("/data", 1);
   shmid = shmget(key, 1024, IPC_CREAT|0644);
 	sprintf(shmidChar, "%d", shmid);
@@ -42,11 +92,23 @@ int main(){
     perror("fork error");
     exit(1);
   }
-  else if( inputProcId == 0 ){ /* -MARK: input Process */
+  else if( inputProcId == 0 ){ 
+    /* -MARK: input Process */
+    /* pass the key to child process */
 		char *argv[] = {"./reader", shmidChar, NULL};
 		execv(argv[0], argv);
   }
   else{
+    /* variables
+     *  processingChild, status: when parents process die, check the child process still running
+     *  mode: current mode
+     *  tm_ptr: current time
+     *  fndData: Data that show on FND
+     *  string: string that show on LCD
+     *  strIndex: index for string. use this variable in mode3
+     *  ledstat: data for led value
+     *  dotMatrix: data for dotMatrix value
+     * */
     int processingChild, status;
 		int mode = 1;
 		struct tm *tm_ptr;
@@ -60,20 +122,16 @@ int main(){
 
 		mode1Init(&tm_ptr);
 
+    /* mapping the shared memory address */
     shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
-		/*for(i=0; i<4; i++){
-			shmaddr[ FND_START +i] = fndData[i];
-		}
-		for(i=0; i<32; i++){
-			shmaddr[ STR_START +i] = string[i];
-		}*/
-
 
     if( (outputProcId = fork()) < 0 ){
       perror("fork error");
       exit(1);
     }
-    else if( outputProcId == 0 ){ /* -MARK: output Process */
+    else if( outputProcId == 0 ){ 
+      /* -MARK: output Process */
+      /* pass the key to child process */
 			char *argv[] = {"./writer", shmidChar, NULL};
 			execv(argv[0], argv);
     }
@@ -83,22 +141,27 @@ int main(){
       int pressedKey = shmaddr[0];
 			int swbutton[9];
       usleep(400000);
+      /* get the information about sw button pressed */
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
 
 			printf("press %d %d %d\n ", pressedKey, mode, ledstat);
       if( pressedKey == 158 ){
+        /* function button(back) pressed */
 				/* Quit */
         break;
       }
       else if( pressedKey == 116 ){
+        /* function button(proc) pressed */
       }
       else if( pressedKey == 115 ){
+        /* function button(vol+) pressed */
 				/* Mode Change + */
 				mode = (mode+1)%4;
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
       }
       else if( pressedKey == 114 ){
+        /* function button(vol-) pressed */
 				/* Mode Change - */
 				mode--;
 				if( mode < 0 )
@@ -106,6 +169,7 @@ int main(){
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
       }
 
+      /* calculate something according to the mode*/
 			if( mode == 1 ){
 				ledstat = mode1swbutton(swbutton, tm_ptr, fndData);
 			}
@@ -116,6 +180,7 @@ int main(){
 				mode3swbutton(swbutton, string, &strIndex, &dotMatrix, &ledstat);
 			}
 
+      /* write the data on shared memory for output */
 			shmaddr[10] = mode;
 			shmaddr[11] = ledstat;
 			for(i=0; i<4; i++){
