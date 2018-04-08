@@ -18,6 +18,7 @@
 
 unsigned char fndData[4];
 unsigned char string[32];
+unsigned char dotTable[10];
 
 void readFromSM(int* shmaddr, int *mode, int *ledstat, int *dotMat){
 	int i;
@@ -30,6 +31,9 @@ void readFromSM(int* shmaddr, int *mode, int *ledstat, int *dotMat){
 		string[i] = shmaddr[16+i];
 	}
 	*dotMat = shmaddr[48];
+	for(i=0; i<10; i++){
+		dotTable[i] = shmaddr[49+i];
+	}
 }
 
 void FNDmode1(){
@@ -112,7 +116,6 @@ void Dot(int dotMatrix){
 	}
 	
 
-	//size = sizeof(fpga_number[dotMatrix]);
 	if( dotMatrix == -1 )
 		write(dev, fpga_set_blank, sizeof(fpga_set_blank));
 	else{
@@ -122,6 +125,26 @@ void Dot(int dotMatrix){
 
 	close(dev);
 }
+
+void Dot2(){
+	int dev = open("/dev/fpga_dot", O_WRONLY);
+	int size;
+	int i;
+	if( dev < 0 ){
+		perror("Dot Matrix");
+		close(dev);
+		return ;
+	}
+
+	size = sizeof(dotTable);
+	//for(i=0; i<10; i++)
+		//printf("dot %d: %x\n", i, dotTable[i]);
+	write(dev, dotTable, size);
+
+	sleep(1);
+	close(dev);
+}
+
 
 int main(int argc, char* argv[]){
   key_t key;
@@ -137,7 +160,7 @@ int main(int argc, char* argv[]){
 	while(1){
 		readFromSM(shmaddr, &mode, &ledstat, &dotMatrix);
 		FNDmode1();
-
+		Dot(-1);
 		if( mode == 1 ){
 			if( ledstat == 1 ){
 				static int check = 0;
@@ -163,6 +186,10 @@ int main(int argc, char* argv[]){
 			Dot(dotMatrix);
 			LED(0);
 			//LCD();
+		}
+		else if( mode == 4 ){
+			Dot2();
+			//printf("dot printf\n");	
 		}
 		LCD();
 	}

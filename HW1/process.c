@@ -16,6 +16,7 @@
 
 #define FND_START 12
 #define STR_START 16
+#define DOTTABLE_START 49
 
 /* name: mode1swbutton
  * return: time editing flag, false or true
@@ -30,7 +31,7 @@
  *    if swbutton[2] == 1: increase 1 hour
  *    if swbutton[3] == 1: increase 1 min
  *                                                */
-int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData);
+int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange);
 
 /* name: mode2swbutton
  * return: none
@@ -71,6 +72,8 @@ void mode1Init(struct tm **tm_ptr);
  *                                            */
 void mode2Init(unsigned char *fndData);
 void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt);
+void mode4swbutton(int* swbutton, unsigned char* table, int* row, int* col, int *cnt);
+void setBit(unsigned char *data, int n, int setOrClear);
 
 int main(){
   int inputProcId, outputProcId;
@@ -118,8 +121,10 @@ int main(){
 		int strIndex = -1;
 		int i;
 		int ledstat=0, dotMatrix=0;
+		unsigned char dotTable[10] = {0};
+		int dotRow=1, dotCol=0;
+		int isVisible = 1;
 		
-
 		mode1Init(&tm_ptr);
 
     /* mapping the shared memory address */
@@ -157,23 +162,25 @@ int main(){
       else if( pressedKey == 115 ){
         /* function button(vol+) pressed */
 				/* Mode Change + */
-				mode = (mode+1)%4;
+				mode = (mode+1)%4+1;
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				//ischange = 0;
 				strIndex = -1;
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
 				/* Mode Change - */
 				mode--;
-				if( mode < 0 )
+				if( mode < 1 )
 					mode =  4;
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				//isChange = 0;
 				strIndex = -1;
       }
 
       /* calculate something according to the mode*/
 			if( mode == 1 ){
-				ledstat = mode1swbutton(swbutton, tm_ptr, fndData);
+				ledstat = mode1swbutton(swbutton, tm_ptr, fndData, ledstat);
 			}
 			else if( mode == 2 ){
 				mode2swbutton(swbutton, fndData, &ledstat);
@@ -187,6 +194,9 @@ int main(){
 				fndData[2] = ledstat/10;
 				fndData[3] = (ledstat)%10;
 			}
+			else if( mode == 4 ){
+				mode4swbutton(swbutton, dotTable, &dotRow, &dotCol, &ledstat);
+			}
 
       /* write the data on shared memory for output */
 			shmaddr[10] = mode;
@@ -197,8 +207,13 @@ int main(){
 			for(i=0; i<32; i++){
 				shmaddr[ STR_START +i] = string[i];
 			}
-			printf("%s\n", string);
+			//printf("%s\n", string);
 			shmaddr[48] = dotMatrix;
+			for(i=0; i<10; i++){
+				//printf("dottable : %x\n", dotTable[i]);
+				shmaddr[DOTTABLE_START+i] = dotTable[i];
+			}
+
     }
 
     //prctl(PR_SET_PDEATHSIG, SIGTERM);
@@ -214,8 +229,8 @@ int main(){
 }
 
 
-int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData){
-	static int isChange = 0;
+int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange){
+	//static int isChange = 0;
 	if( swbutton[0] == KEY_PRESS ){
 		isChange = !isChange;
 	}
@@ -315,6 +330,8 @@ void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat
 		*dotMatrix = 10;
 		memset(string, ' ', sizeof(unsigned char) * 32);
 	}
+	else if( mode == 4 ){
+	}
 }
 
 void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt){
@@ -336,8 +353,6 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 				index2 = i;
 		}
 	}
-
-	//printf("ins1 %d ins2 %d\n", index1, index2);
 
 	if( index1 == 1 && index2 == 2 ){
 		/* pressed sw(2), sw(3) */
@@ -371,7 +386,6 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 				if( index1 != clickedBefore ){
 					clickedBefore = index1;
 					clickCnt = 0;
-					//(*cnt)++;
 					(*strIndex)++;
 				}
 				else {
@@ -388,10 +402,49 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 			(*cnt)++;
 			printf("str : %c %d\n", c, *strIndex);
 			string[(*strIndex)] = c;
-			//(*cnt)++;
-			//(*strIndex)++;
 		}
 	}
 	(*cnt) = (*cnt)%10000;
 	(*strIndex) = (*strIndex)%32;
+}
+
+void mode4swbutton(int* swbutton, unsigned char* table, int* row, int* col, int *cnt){
+	static int isblink = 0;
+	int i,j;
+	isblink = !isblink;
+
+	if( swbutton[1] == KEY_PRESS ){
+		(*col)--;
+		if( (*col) < 0 )
+			(*col) = 0;
+	}
+	if( swbutton[3] == KEY_PRESS ){
+		(*row)--;
+		if( (*row) < 1 )
+			(*row) = 1;
+	}
+	if( swbutton[5] == KEY_PRESS ){
+		(*row)++;
+		if( (*row) > 7 )
+			(*row) = 7;
+	}
+	if( swbutton[7] == KEY_PRESS ){
+		(*col)++;
+		if( (*col) > 9 )
+			(*col) = 9;
+	}
+
+	setBit( &(table[(*col)]), 7-(*row), isblink); 
+	//for(i=0; i<10; i++){
+		//for(j=1; j<8; j++){
+			//setBit( &(table[i]), 7-(j), 1);
+		//}
+	//}
+}
+
+void setBit(unsigned char *data, int n, int setOrClear){
+	if( setOrClear )
+		(*data) |= (1 << (n));
+	else
+		(*data) &= ~(1 << (n));
 }
