@@ -72,8 +72,9 @@ void mode1Init(struct tm **tm_ptr);
  *                                            */
 void mode2Init(unsigned char *fndData);
 void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dotMatrix, int *cnt);
-void mode4swbutton(int* swbutton, unsigned char* table, int* row, int* col, int *cnt);
+void mode4swbutton(int* swbutton, unsigned char* table, unsigned char* tableCheck, int* row, int* col, int* isVisible, int *cnt);
 void setBit(unsigned char *data, int n, int setOrClear);
+void flipBit(unsigned char *data);
 
 int main(){
   int inputProcId, outputProcId;
@@ -122,6 +123,7 @@ int main(){
 		int i;
 		int ledstat=0, dotMatrix=0;
 		unsigned char dotTable[10] = {0};
+		unsigned char dotTableFlag[10] = {0};
 		int dotRow=1, dotCol=0;
 		int isVisible = 1;
 		
@@ -150,7 +152,7 @@ int main(){
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
 
-			printf("press %d %d %d\n ", pressedKey, mode, ledstat);
+			printf("mode: %d\n ", mode);
       if( pressedKey == 158 ){
         /* function button(back) pressed */
 				/* Quit */
@@ -164,8 +166,12 @@ int main(){
 				/* Mode Change + */
 				mode = (mode+1)%4+1;
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
-				//ischange = 0;
 				strIndex = -1;
+				memset(dotTable, 0, sizeof(unsigned char)*10);
+				memset(dotTableFlag, 0, sizeof(unsigned char)*10);
+				dotRow=1;
+			 	dotCol=0;
+				isVisible = 1;
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
@@ -174,8 +180,12 @@ int main(){
 				if( mode < 1 )
 					mode =  4;
 				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
-				//isChange = 0;
 				strIndex = -1;
+				memset(dotTable, 0, sizeof(unsigned char)*10);
+				memset(dotTableFlag, 0, sizeof(unsigned char)*10);
+				dotRow=1;
+			 	dotCol=0;
+				isVisible = 1;
       }
 
       /* calculate something according to the mode*/
@@ -195,7 +205,13 @@ int main(){
 				fndData[3] = (ledstat)%10;
 			}
 			else if( mode == 4 ){
-				mode4swbutton(swbutton, dotTable, &dotRow, &dotCol, &ledstat);
+				mode4swbutton(swbutton, dotTable, dotTableFlag, &dotRow, &dotCol, &isVisible, &ledstat);
+				fndData[0] = ledstat/1000;
+				ledstat = ledstat%1000;	
+				fndData[1] = (ledstat)/100;
+				ledstat = ledstat%100;
+				fndData[2] = ledstat/10;
+				fndData[3] = (ledstat)%10;
 			}
 
       /* write the data on shared memory for output */
@@ -207,10 +223,8 @@ int main(){
 			for(i=0; i<32; i++){
 				shmaddr[ STR_START +i] = string[i];
 			}
-			//printf("%s\n", string);
 			shmaddr[48] = dotMatrix;
 			for(i=0; i<10; i++){
-				//printf("dottable : %x\n", dotTable[i]);
 				shmaddr[DOTTABLE_START+i] = dotTable[i];
 			}
 
@@ -408,7 +422,7 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 	(*strIndex) = (*strIndex)%32;
 }
 
-void mode4swbutton(int* swbutton, unsigned char* table, int* row, int* col, int *cnt){
+void mode4swbutton(int* swbutton, unsigned char* table, unsigned char* tableCheck, int* row, int* col, int* isVisible, int *cnt){
 	static int isblink = 0;
 	int i,j;
 	isblink = !isblink;
@@ -417,29 +431,64 @@ void mode4swbutton(int* swbutton, unsigned char* table, int* row, int* col, int 
 		(*col)--;
 		if( (*col) < 0 )
 			(*col) = 0;
+		isblink = 1;
+		(*cnt)++;
 	}
 	if( swbutton[3] == KEY_PRESS ){
 		(*row)--;
 		if( (*row) < 1 )
 			(*row) = 1;
+		isblink = 1;
+		(*cnt)++;
 	}
 	if( swbutton[5] == KEY_PRESS ){
 		(*row)++;
 		if( (*row) > 7 )
 			(*row) = 7;
+		isblink = 1;
+		(*cnt)++;
 	}
 	if( swbutton[7] == KEY_PRESS ){
 		(*col)++;
 		if( (*col) > 9 )
 			(*col) = 9;
+		isblink = 1;
+		(*cnt)++;
 	}
 
-	setBit( &(table[(*col)]), 7-(*row), isblink); 
-	//for(i=0; i<10; i++){
-		//for(j=1; j<8; j++){
-			//setBit( &(table[i]), 7-(j), 1);
-		//}
-	//}
+	if( swbutton[0] == KEY_PRESS ){
+		(*row) = 1;
+		(*col) = 0;
+		memset(tableCheck, 0, sizeof(unsigned char)*10);
+		(*cnt) = 0;
+	}
+
+	if( swbutton[2] == KEY_PRESS ){
+		(*isVisible) = !(*isVisible);
+		(*cnt)++;
+	}
+
+	if( swbutton[4] == KEY_PRESS ){
+		setBit( &(tableCheck[(*col)]), 7-(*row), 1 );
+		(*cnt)++;
+	}
+	if( swbutton[6] == KEY_PRESS ){
+		memset(tableCheck, 0, sizeof(unsigned char)*10);
+		(*cnt)++;
+	}
+	if( swbutton[8] == KEY_PRESS ){
+		int i;
+		for(i=0; i<10; i++){
+			flipBit( &(tableCheck[i]) );
+		}
+		(*cnt)++;
+	}
+	if( (*cnt) > 9999 )
+		(*cnt) = 0;
+
+	memcpy( table, tableCheck, sizeof(unsigned char)*10 );
+	if( (*isVisible) == 1)
+		setBit( &(table[(*col)]), 7-(*row), isblink); 
 }
 
 void setBit(unsigned char *data, int n, int setOrClear){
@@ -447,4 +496,8 @@ void setBit(unsigned char *data, int n, int setOrClear){
 		(*data) |= (1 << (n));
 	else
 		(*data) &= ~(1 << (n));
+}
+
+void flipBit(unsigned char *data){
+	(*data) ^= 0xff;
 }
