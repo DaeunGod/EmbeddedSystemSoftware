@@ -16,7 +16,7 @@ mode1
 -	init: show local time on FND, on LED(1) 
 -	step 
 - 		SW(1)-> blink LED(3) and LED(4), you can change time 
--			SW(2)-> reset time 
+-		SW(2)-> reset time 
 - 		SW(3)-> increase 1 hour 
 - 		SW(4)-> increase 1 min 
 
@@ -25,9 +25,9 @@ mode2
 -	require: ignore thousand digits 
 -	step 
 - 		SW(1)-> change number into decimal, octal, quaternion, binary in turn 
--			SW(2)-> increase hundred digits 
--			SW(3)-> increase ten digits 
--			SW(4)-> increase one digits
+-		SW(2)-> increase hundred digits 
+-		SW(3)-> increase ten digits 
+-		SW(4)-> increase one digits
 
 mode3
 - 
@@ -36,11 +36,11 @@ mode4
 - 
 					 
 ### Shared Memory
-0 			- event key \
+0 	- event key \
 1 ~ 9 	- sw Buttons \
-10 			- mode \
-11 			- led stat check \
+10 	- mode \
+11 	- led stat check \
 12 ~ 15 - FND Data \
 16 ~ 47 - LCD String Data \
-48 			- Dot matrix Data \
+48 	- Dot matrix Data \
 49 ~ 58 - Dot Matrix Table
