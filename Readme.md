@@ -26,6 +26,9 @@ mode2 \
 				SW(2)-> increase hundred digits \
 				SW(3)-> increase ten digits \
 				SW(4)-> increase one digits
+\
+mode3 \
+	
 					 
 ### Shared Memory
 0 - event key \

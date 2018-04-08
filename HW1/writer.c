@@ -61,7 +61,7 @@ void LCD(){
     close(dev);
     exit(1);
   }
-	printf("%s\n", string);
+	//printf("%s\n", string);
 	write(dev, string, 32);
 	close(dev);
 	//memset(string, 0, sizeof(string));
@@ -135,8 +135,8 @@ int main(int argc, char* argv[]){
 	LED(128);
 	Dot(-1);
 	while(1){
-		FNDmode1();
 		readFromSM(shmaddr, &mode, &ledstat, &dotMatrix);
+		FNDmode1();
 
 		if( mode == 1 ){
 			if( ledstat == 1 ){
@@ -161,7 +161,10 @@ int main(int argc, char* argv[]){
 		}
 		else if( mode == 3 ){
 			Dot(dotMatrix);
+			LED(0);
+			//LCD();
 		}
+		LCD();
 	}
 	return 0;
 }

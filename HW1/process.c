@@ -53,7 +53,7 @@ void mode2swbutton(int* swbutton, unsigned char* fndData, int *number);
  *  others: variables that need to initialize
  * desc: initialize the variables according to the mode
  *                                                    */
-void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix);
+void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix, unsigned char* string);
 
 /* name: mode1Init
  * return: none
@@ -115,7 +115,7 @@ int main(){
 
 		unsigned char fndData[4]={0};
 		unsigned char string[32] = {"Hello           World          "};
-		int strIndex = 0;
+		int strIndex = -1;
 		int i;
 		int ledstat=0, dotMatrix=0;
 		
@@ -158,7 +158,8 @@ int main(){
         /* function button(vol+) pressed */
 				/* Mode Change + */
 				mode = (mode+1)%4;
-				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
+				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				strIndex = -1;
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
@@ -166,7 +167,8 @@ int main(){
 				mode--;
 				if( mode < 0 )
 					mode =  4;
-				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix);
+				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				strIndex = -1;
       }
 
       /* calculate something according to the mode*/
@@ -178,6 +180,12 @@ int main(){
 			}
 			else if( mode == 3 ){
 				mode3swbutton(swbutton, string, &strIndex, &dotMatrix, &ledstat);
+				fndData[0] = ledstat/1000;
+				ledstat = ledstat%1000;	
+				fndData[1] = (ledstat)/100;
+				ledstat = ledstat%100;
+				fndData[2] = ledstat/10;
+				fndData[3] = (ledstat)%10;
 			}
 
       /* write the data on shared memory for output */
@@ -189,6 +197,7 @@ int main(){
 			for(i=0; i<32; i++){
 				shmaddr[ STR_START +i] = string[i];
 			}
+			printf("%s\n", string);
 			shmaddr[48] = dotMatrix;
     }
 
@@ -292,9 +301,10 @@ void mode2Init(unsigned char *fndData){
 	memset(fndData, 0, sizeof(unsigned char)*4);
 }
 
-void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix){
+void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat, int *dotMatrix, unsigned char* string){
 	*ledstat = 0;
 	memset(fndData, 0, sizeof(unsigned char)*4);
+	strcpy(string, "Hello           World         \0");
 	if( mode == 1)
 		mode1Init(&tm_ptr);
 	else if( mode == 2 ){
@@ -302,7 +312,8 @@ void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat
 		*ledstat = 10;
 	}
 	else if( mode == 3 ){
-		*dotMatrix = 1;
+		*dotMatrix = 10;
+		memset(string, ' ', sizeof(unsigned char) * 32);
 	}
 }
 
@@ -331,6 +342,8 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 	if( index1 == 1 && index2 == 2 ){
 		/* pressed sw(2), sw(3) */
 		/* clear string					*/
+		memset(string, ' ', sizeof(unsigned char) * 32);
+		(*cnt) += 2;
 	}
 	else if( index1 == 4 && index2 == 5 ){
 		/* pressed sw(5), sw(6) */
@@ -339,30 +352,46 @@ void mode3swbutton(int* swbutton, unsigned char *string, int *strIndex, int* dot
 		 	*dotMatrix = 10;
 		else
 			*dotMatrix = 1;
+		(*cnt) += 2;
 	}
 	else if( index1 == 7 && index2 == 8 ){
 		/* pressed sw(8), sw(9) */
 		/* make space 					*/
+		(*strIndex)++;
+		string[(*strIndex)] = ' ';
+		clickedBefore = -1;
+		clickCnt = 0;
+		(*cnt) += 2;
 	}
 	else{
 		if( index1 != -1 ){
 			char c;
+			
+			if( (*dotMatrix) == 10 ){
+				if( index1 != clickedBefore ){
+					clickedBefore = index1;
+					clickCnt = 0;
+					//(*cnt)++;
+					(*strIndex)++;
+				}
+				else {
+					clickCnt++;
+					clickCnt = clickCnt % 3;
+				}
+				c	= charTable[index1][clickCnt];
+			}
+			else{
+				c = (index1+1)+'0';
+				(*strIndex)++;
+			}
 
-			if( index1 != clickedBefore ){
-				clickedBefore = index1;
-			}
-			else {
-				clickCnt++;
-				clickCnt = clickCnt % 3;
-			}
-		
-			c	= charTable[index1][clickCnt];
-			string[*strIndex] = c;
 			(*cnt)++;
-			(*strIndex)++;
+			printf("str : %c %d\n", c, *strIndex);
+			string[(*strIndex)] = c;
+			//(*cnt)++;
+			//(*strIndex)++;
 		}
 	}
-
-
-
+	(*cnt) = (*cnt)%10000;
+	(*strIndex) = (*strIndex)%32;
 }
