@@ -45,7 +45,7 @@ int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int 
  *  if swbutton[2] == 1: increase ten digits
  *  if swbutton[3] == 1: increase one digits
  *                                            */
-void mode2swbutton(int* swbutton, unsigned char* fndData, int *number);
+void mode2swbutton(int* swbutton, unsigned char* fndData, int *count, int *number);
 
 /* name: modesInit
  * return: none
@@ -122,6 +122,7 @@ int main(){
 		int strIndex = -1;
 		int i;
 		int ledstat=0, dotMatrix=0;
+		int count=0;
 		unsigned char dotTable[10] = {0};
 		unsigned char dotTableFlag[10] = {0};
 		int dotRow=1, dotCol=0;
@@ -172,6 +173,7 @@ int main(){
 				dotRow=1;
 			 	dotCol=0;
 				isVisible = 1;
+				count = 0;
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
@@ -186,6 +188,7 @@ int main(){
 				dotRow=1;
 			 	dotCol=0;
 				isVisible = 1;
+				count = 0;
       }
 
       /* calculate something according to the mode*/
@@ -193,7 +196,7 @@ int main(){
 				ledstat = mode1swbutton(swbutton, tm_ptr, fndData, ledstat);
 			}
 			else if( mode == 2 ){
-				mode2swbutton(swbutton, fndData, &ledstat);
+				mode2swbutton(swbutton, fndData, &count, &ledstat);
 			}
 			else if( mode == 3 ){
 				mode3swbutton(swbutton, string, &strIndex, &dotMatrix, &ledstat);
@@ -276,19 +279,19 @@ void mode1Init(struct tm **tm_ptr){
 	*tm_ptr = localtime(&t);
 }
 
-void mode2swbutton(int* swbutton, unsigned char* fndData, int *number){
-	int divider = *number;
+void mode2swbutton(int* swbutton, unsigned char* fndData, int *count, int *number){
+	int temp=0;
 	if(*number == 0 ){
 		printf("divider is zeor\n");
 		return ;
 	}
 
 	if( swbutton[0] == KEY_PRESS ){
-		int origin=0;
+		//int origin=0;
 
-		origin += fndData[1] * divider * divider;
-		origin += fndData[2] * divider;
-		origin += fndData[3];
+		//origin += fndData[1] * divider * divider;
+		//origin += fndData[2] * divider;
+		//origin += fndData[3];
 
 		if( *number == 10 )
 			*number = 8;
@@ -299,31 +302,40 @@ void mode2swbutton(int* swbutton, unsigned char* fndData, int *number){
 		else
 			*number = 10;
 
-		divider = *number;
+		/*divider = *number;
 		origin %= (divider*divider*divider);
 		fndData[1] = origin/(divider*divider);
 		origin %= (divider*divider);
 		fndData[2] = origin/divider;
 		origin %= divider;
-		fndData[3] = origin;
+		fndData[3] = origin;*/
 	}
 	if( swbutton[1] == KEY_PRESS ){
-		fndData[1] = fndData[1]%(*number);
+		//fndData[1] = fndData[1]%(*number);
+		(*count) += (*number)*(*number);
 	}
 	if( swbutton[2] == KEY_PRESS ){
-		fndData[2] = fndData[2]+1;
-		fndData[1] += fndData[2]/(*number);
-		fndData[1] = fndData[1]%(*number);
-		fndData[2] = fndData[2]%(*number);
+		//fndData[2] = fndData[2]+1;
+		//fndData[1] += fndData[2]/(*number);
+		//fndData[1] = fndData[1]%(*number);
+		//fndData[2] = fndData[2]%(*number);
+		(*count) += (*number);
 	}
 	if( swbutton[3] == KEY_PRESS ){
-		fndData[3]++;
-		fndData[2] += fndData[3]/(*number);
-		fndData[1] += fndData[2]/(*number);
-		fndData[1] = fndData[1]%(*number);
-		fndData[2] = fndData[2]%(*number);
-		fndData[3] = fndData[3]%(*number);
+		(*count) += 1;
+		//fndData[3]++;
+		//fndData[2] += fndData[3]/(*number);
+		//fndData[1] += fndData[2]/(*number);
+		//fndData[1] = fndData[1]%(*number);
+		//fndData[2] = fndData[2]%(*number);
+		//fndData[3] = fndData[3]%(*number);
 	}
+	temp = (*count);
+	fndData[3] = temp%10;
+	temp /= 10;
+	fndData[2] = temp%10;
+	temp /= 10;
+	fndData[1] = temp%10;
 }
 
 void mode2Init(unsigned char *fndData){
