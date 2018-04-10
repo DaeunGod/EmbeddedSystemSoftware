@@ -18,6 +18,49 @@
 #define STR_START 16
 #define DOTTABLE_START 49
 
+typedef struct{
+	int curMode;
+	struct tm *initTime;
+	struct tm *curTime;
+	unsigned char fndData[4];
+	unsigned char string[32];
+	int strIndex;
+	int ledValue;
+  int	dotIndex;
+	int count;
+}commonVari;
+
+typedef struct{
+		unsigned char dotTable[10];
+		unsigned char dotTableFlag[10];
+		int dotRow;
+		int dotCol;
+		int isVisible;
+		int count;
+}drawDotVari;
+
+void commomVariInit( commonVari* cv, int mode ){
+	time_t t = time(NULL);
+
+	cv->curMode = mode;
+	cv->initTime = localtime(&t);
+	cv->curTime = localtime(&t);
+	memset(cv->fndData, 0, sizeof(unsigned char)*4);
+	strcpy(cv->string, "Hello           World         \0");
+	cv->strIndex = 0;
+	cv->ledValue = 0;
+	cv->dotIndex = 0;
+	cv->count = 0;
+
+	if( mode == 2 ){
+		cv->ledValue = 10;
+	}
+	else if( mode == 3 ){
+		cv->dotIndex = 10;
+		memset(cv->string, ' ', sizeof(unsigned char) * 32);
+	}
+}
+
 /* name: mode1swbutton
  * return: time editing flag, false or true
  * param
@@ -31,7 +74,8 @@
  *    if swbutton[2] == 1: increase 1 hour
  *    if swbutton[3] == 1: increase 1 min
  *                                                */
-int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange);
+//int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange);
+int mode1swbutton(int* swbutton, commonVari *cv);
 
 /* name: mode2swbutton
  * return: none
@@ -115,20 +159,23 @@ int main(){
      * */
     int processingChild, status;
 		int mode = 1;
-		struct tm *tm_ptr;
+		//struct tm *tm_ptr;
 
-		unsigned char fndData[4]={0};
-		unsigned char string[32] = {"Hello           World          "};
-		int strIndex = -1;
+		//unsigned char fndData[4]={0};
+		//unsigned char string[32] = {"Hello           World          "};
+		//int strIndex = -1;
 		int i;
-		int ledstat=0, dotMatrix=0;
-		int count=0;
+		//int ledstat=0, dotMatrix=0;
+		//int count=0;
+		commonVari cv;
+
 		unsigned char dotTable[10] = {0};
 		unsigned char dotTableFlag[10] = {0};
 		int dotRow=1, dotCol=0;
 		int isVisible = 1;
 		
-		mode1Init(&tm_ptr);
+		commomVariInit( &cv, 1 );
+		//mode1Init(&tm_ptr);
 
     /* mapping the shared memory address */
     shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
@@ -153,7 +200,7 @@ int main(){
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
 
-			printf("mode: %d\n ", mode);
+			printf("mode: %d\n ", cv.curMode);
       if( pressedKey == 158 ){
         /* function button(back) pressed */
 				/* Quit */
@@ -166,14 +213,15 @@ int main(){
         /* function button(vol+) pressed */
 				/* Mode Change + */
 				mode = (mode+1)%4+1;
-				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
-				strIndex = -1;
-				memset(dotTable, 0, sizeof(unsigned char)*10);
-				memset(dotTableFlag, 0, sizeof(unsigned char)*10);
-				dotRow=1;
-			 	dotCol=0;
-				isVisible = 1;
-				count = 0;
+				commomVariInit( &cv, mode );
+				//modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				//strIndex = -1;
+				//memset(dotTable, 0, sizeof(unsigned char)*10);
+				//memset(dotTableFlag, 0, sizeof(unsigned char)*10);
+				//dotRow=1;
+			 	//dotCol=0;
+				//isVisible = 1;
+				//count = 0;
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
@@ -181,21 +229,23 @@ int main(){
 				mode--;
 				if( mode < 1 )
 					mode =  4;
-				modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
-				strIndex = -1;
-				memset(dotTable, 0, sizeof(unsigned char)*10);
-				memset(dotTableFlag, 0, sizeof(unsigned char)*10);
-				dotRow=1;
-			 	dotCol=0;
-				isVisible = 1;
-				count = 0;
+				commomVariInit( &cv, mode );
+				//modesInit(mode, tm_ptr, fndData, &ledstat, &dotMatrix, string);
+				//strIndex = -1;
+				//memset(dotTable, 0, sizeof(unsigned char)*10);
+				//memset(dotTableFlag, 0, sizeof(unsigned char)*10);
+				//dotRow=1;
+			 	//dotCol=0;
+				//isVisible = 1;
+				//count = 0;
       }
 
       /* calculate something according to the mode*/
 			if( mode == 1 ){
-				ledstat = mode1swbutton(swbutton, tm_ptr, fndData, ledstat);
+				//ledstat = mode1swbutton(swbutton, tm_ptr, fndData, ledstat);
+				mode1swbutton(swbutton, &cv);
 			}
-			else if( mode == 2 ){
+			/*else if( mode == 2 ){
 				mode2swbutton(swbutton, fndData, &count, &ledstat);
 			}
 			else if( mode == 3 ){
@@ -215,21 +265,21 @@ int main(){
 				ledstat = ledstat%100;
 				fndData[2] = ledstat/10;
 				fndData[3] = (ledstat)%10;
-			}
+			}*/
 
       /* write the data on shared memory for output */
-			shmaddr[10] = mode;
-			shmaddr[11] = ledstat;
+			shmaddr[10] = cv.curMode;
+			shmaddr[11] = cv.ledValue;
 			for(i=0; i<4; i++){
-				shmaddr[ FND_START +i] = fndData[i];
+				shmaddr[ FND_START +i] = cv.fndData[i];
 			}
 			for(i=0; i<32; i++){
-				shmaddr[ STR_START +i] = string[i];
+				shmaddr[ STR_START +i] = cv.string[i];
 			}
-			shmaddr[48] = dotMatrix;
-			for(i=0; i<10; i++){
-				shmaddr[DOTTABLE_START+i] = dotTable[i];
-			}
+			shmaddr[48] = cv.dotIndex;
+			//for(i=0; i<10; i++){
+				//shmaddr[DOTTABLE_START+i] = dotTable[i];
+			//}
 
     }
 
@@ -245,33 +295,47 @@ int main(){
 	return 0;
 }
 
-
-int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange){
-	//static int isChange = 0;
+//int mode1swbutton(int* swbutton, struct tm *tm_ptr, unsigned char* fndData, int isChange){
+int mode1swbutton(int* swbutton, commonVari *cv){
+	static unsigned char deltaTime[2] = {0};
+	time_t t = time(NULL);
 	if( swbutton[0] == KEY_PRESS ){
-		isChange = !isChange;
+		//isChange = !isChange;
+		cv->ledValue = !(cv->ledValue);
 	}
-
-	if( isChange == 1 ){
+	cv->initTime = localtime(&t);
+	if( cv->ledValue == 1 ){
 		if( swbutton[1] == KEY_PRESS ){
-			mode1Init(&tm_ptr);
+			//mode1Init(&tm_ptr);
+			commomVariInit( cv, 1 );
 		}
 		if( swbutton[2] == KEY_PRESS ){
-			tm_ptr->tm_hour++;
+			//tm_ptr->tm_hour++;
+			deltaTime[0]++;
 		}
 		if( swbutton[3] == KEY_PRESS ){
-			tm_ptr->tm_min++;
+			//tm_ptr->tm_min++;
+			deltaTime[1]++;
 		}
-		if(tm_ptr->tm_min >= 60 )
+		/*if(tm_ptr->tm_min >= 60 )
 			tm_ptr->tm_hour++;
 		if( tm_ptr->tm_hour >= 24 )
-			tm_ptr->tm_hour = tm_ptr->tm_hour % 24;
-		
+			tm_ptr->tm_hour = tm_ptr->tm_hour % 24;	*/
+		if( deltaTime[1] >= 60 ){
+			deltaTime[0]++;
+			deltaTime[1] = deltaTime[1]%60;
+		}
+		if( deltaTime[0] >= 24 ){
+			deltaTime[0] = deltaTime[0]%24;
+		}
 	}
-	fndData[0] = tm_ptr->tm_hour/10; fndData[1] = (tm_ptr->tm_hour)%10;
-	fndData[2] = tm_ptr->tm_min/10; fndData[3] = (tm_ptr->tm_min)%10;
 
-	return isChange;
+	cv->fndData[0] = cv->initTime->tm_hour/10 + deltaTime[0]/10; 
+	cv->fndData[1] = (cv->initTime->tm_hour)%10 + deltaTime[0]%10;
+	cv->fndData[2] = cv->initTime->tm_min/10 + deltaTime[1]/10;
+ 	cv->fndData[3] = (cv->initTime->tm_min)%10 + deltaTime[1]%10;
+
+	return 0;
 }
 
 void mode1Init(struct tm **tm_ptr){
@@ -349,7 +413,6 @@ void modesInit(int mode, struct tm *tm_ptr, unsigned char* fndData, int *ledstat
 	if( mode == 1)
 		mode1Init(&tm_ptr);
 	else if( mode == 2 ){
-		//mode2Init(fndData);
 		*ledstat = 10;
 	}
 	else if( mode == 3 ){
@@ -495,8 +558,9 @@ void mode4swbutton(int* swbutton, unsigned char* table, unsigned char* tableChec
 		}
 		(*cnt)++;
 	}
-	if( (*cnt) > 9999 )
-		(*cnt) = 0;
+	//if( (*cnt) > 9999 )
+		//(*cnt) = 0;
+	//printf("row %d, col %d\n", *row, *col);
 
 	memcpy( table, tableCheck, sizeof(unsigned char)*10 );
 	if( (*isVisible) == 1)

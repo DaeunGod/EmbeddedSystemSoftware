@@ -11,6 +11,7 @@
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <time.h>
 #include "fpga_dot_font.h"
 
 #define FPGA_BASE_ADDRESS 0x08000000
@@ -65,10 +66,8 @@ void LCD(){
     close(dev);
     exit(1);
   }
-	//printf("%s\n", string);
 	write(dev, string, 32);
 	close(dev);
-	//memset(string, 0, sizeof(string));
 }
 
 void LED(int n){
@@ -101,7 +100,7 @@ void LED(int n){
 
 	*led_addr = n;
 
-	sleep(1);
+	//sleep(1);
 	munmap(led_addr, 4096);
 	close(fd);
 }
@@ -118,7 +117,11 @@ void Dot(int dotMatrix){
 
 	if( dotMatrix == -1 )
 		write(dev, fpga_set_blank, sizeof(fpga_set_blank));
-	else{
+	else if( dotMatrix == -2){
+		size = sizeof(dotTable);
+		write(dev, dotTable, size);
+	}
+	else {
 		size = sizeof(fpga_number[dotMatrix]);
 		write(dev, fpga_number[dotMatrix], size);
 	}
@@ -137,11 +140,11 @@ void Dot2(){
 	}
 
 	size = sizeof(dotTable);
-	//for(i=0; i<10; i++)
-		//printf("dot %d: %x\n", i, dotTable[i]);
+	for(i=0; i<10; i++)
+		printf("dot %d: %x\n", i, dotTable[i]);
 	write(dev, dotTable, size);
 
-	sleep(1);
+	//sleep(1);
 	close(dev);
 }
 
@@ -151,6 +154,9 @@ int main(int argc, char* argv[]){
   int shmid = atoi(argv[1]);
   int *shmaddr = NULL;
 	int mode=0, ledstat=0, dotMatrix;
+	time_t initTime, currentTime;
+	time(&initTime);
+	time(&currentTime);
 
   shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 	readFromSM(shmaddr, &mode, &ledstat, &dotMatrix); // Initialize
@@ -160,36 +166,50 @@ int main(int argc, char* argv[]){
 	while(1){
 		readFromSM(shmaddr, &mode, &ledstat, &dotMatrix);
 		FNDmode1();
-		Dot(-1);
+		//Dot(-1);
 		if( mode == 1 ){
-			if( ledstat == 1 ){
-				static int check = 0;
-				LED( (check ? 32 : 16) );
-				check = !check;
+			time(&currentTime);
+			if( currentTime - initTime >= 1 ){
+				initTime = currentTime;
+				if( ledstat == 1 ){
+					static int check = 0;
+					LED( (check ? 32 : 16) );
+					check = !check;
+				}
+				else
+					LED(128);
 			}
-			else
-				LED(128);
-			
-			//printf("mode : %d, %d\n", mode, isChange);
 		}
 		else if( mode == 2 ){
-			if( ledstat == 10 )
-				LED(64);
-			else if( ledstat == 8 )
-				LED(32);
-			else if( ledstat == 4 )
-				LED(16);
-			else
-				LED(128);
+			time(&currentTime);
+			if( currentTime - initTime >= 1 ){
+				initTime = currentTime;
+				if( ledstat == 10 )
+					LED(64);
+				else if( ledstat == 8 )
+					LED(32);
+				else if( ledstat == 4 )
+					LED(16);
+				else
+					LED(128);
+			}
 		}
 		else if( mode == 3 ){
-			Dot(dotMatrix);
-			LED(0);
-			//LCD();
+			time(&currentTime);
+			if( currentTime - initTime >= 1 ){
+				initTime = currentTime;
+				Dot(dotMatrix);
+				LED(0);
+			}
 		}
 		else if( mode == 4 ){
-			Dot2();
-			//printf("dot printf\n");	
+			time(&currentTime);
+			if( currentTime - initTime >= 1 ){
+				printf("dot2\n");
+				initTime = currentTime;
+				//Dot2();
+				Dot(-2);
+			}
 		}
 		LCD();
 	}
