@@ -169,6 +169,7 @@ int main(int argc, char* argv[]){
 		//Dot(-1);
 		if( mode == 1 ){
 			time(&currentTime);
+			Dot(-1);
 			if( currentTime - initTime >= 1 ){
 				initTime = currentTime;
 				if( ledstat == 1 ){
@@ -182,6 +183,7 @@ int main(int argc, char* argv[]){
 		}
 		else if( mode == 2 ){
 			time(&currentTime);
+			Dot(-1);
 			if( currentTime - initTime >= 1 ){
 				initTime = currentTime;
 				if( ledstat == 10 )
@@ -203,14 +205,13 @@ int main(int argc, char* argv[]){
 			}
 		}
 		else if( mode == 4 ){
-			time(&currentTime);
-			if( currentTime - initTime >= 1 ){
-				printf("dot2\n");
-				initTime = currentTime;
-				//Dot2();
-				Dot(-2);
-			}
+			Dot(-2);
 		}
+		else if( mode == 5 ){
+			//printf("dot mat : %d\n", dotMatrix);
+			Dot(dotMatrix);
+		}
+
 		LCD();
 	}
 	return 0;
