@@ -41,6 +41,14 @@ typedef struct{
 		int count;
 }drawDotVari;
 
+typedef struct{
+	unsigned char operand[16];
+	unsigned char tempStr[16];
+	unsigned char operator;
+	int result;
+	int isOperator;
+}extraVari;
+
 void commomVariInit( commonVari *cv, int mode ){
 	time_t t = time(NULL);
 
@@ -78,6 +86,14 @@ void drawDotVariInit( drawDotVari *ddv ){
 	ddv->count = 0;
 }
 
+void extraVariInit( extraVari *ev ){
+	memset(ev->operand, 0, sizeof(ev->operand));
+	memset(ev->tempStr, 0, sizeof(ev->tempStr));
+	ev->operator = 0;
+	ev->result = 0;
+	ev->isOperator = 0;
+}
+
 /* name: mode1swbutton
  * return: time editing flag, false or true
  * param
@@ -108,7 +124,7 @@ int mode1swbutton(int* swbutton, commonVari *cv);
 void mode2swbutton(int* swbutton, commonVari *cv);
 void mode3swbutton(int* swbutton, commonVari *cv);
 void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv);
-void mode5swbutton(int* swbutton, commonVari *cv);
+void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev);
 void setBit(unsigned char *data, int n, int setOrClear);
 void flipBit(unsigned char *data);
 
@@ -154,11 +170,13 @@ int main(){
 		struct timeval startTime, endTime;
 		commonVari cv;
 		drawDotVari ddv;
+		extraVari ev;
 		
 		//time(&(elapsedTime));
 		gettimeofday(&startTime, NULL);
 		commomVariInit( &cv, mode );
 		drawDotVariInit( &ddv );
+		extraVariInit( &ev );
 
     /* mapping the shared memory address */
     shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
@@ -211,6 +229,7 @@ int main(){
 				mode = (mode)%MAX_MODE+1;
 				commomVariInit( &cv, mode );
 				drawDotVariInit( &ddv );
+				extraVariInit( &ev );
       }
       else if( pressedKey == 114 ){
         /* function button(vol-) pressed */
@@ -220,6 +239,7 @@ int main(){
 					mode =  MAX_MODE;
 				commomVariInit( &cv, mode );
 				drawDotVariInit( &ddv );
+				extraVariInit( &ev );
       }
 
       /* calculate something according to the mode*/
@@ -236,7 +256,7 @@ int main(){
 				mode4swbutton( swbutton, &ddv, &cv );
 			}
 			else if( mode == 5 ){
-				mode5swbutton( swbutton, &cv );
+				mode5swbutton( swbutton, &cv, &ev );
 			}
 
       /* write the data on shared memory for output */
@@ -524,7 +544,7 @@ void flipBit(unsigned char *data){
 	(*data) ^= 0xff;
 }
 
-void mode5swbutton(int* swbutton, commonVari *cv){
+void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 	int index1=-1, index2=-1;
   int i;
   static char c;
@@ -543,9 +563,14 @@ void mode5swbutton(int* swbutton, commonVari *cv){
   if( index1 == 1 && index2 == 2 ){
 		/* pressed sw(2), sw(3) */
 	  /* clear string         */
-	  memset(cv->string, ' ', sizeof(unsigned char) * 32);
-	  cv->count ++;
+	  memset(cv->string, ' ', sizeof(cv->string));
+	  memset(ev->operand, 0, sizeof(ev->operand));
+	  memset(ev->tempStr, 0, sizeof(ev->tempStr));
+		cv->count ++;
 	  cv->strIndex = -1;
+	  cv->strIndex = 0;
+		ev->operator = 0;
+		ev->isOperator = 0;
 	}
 	else if( index1 == 3 && index2 == 4 ){
 	  /* pressed sw(5), sw(6) */
@@ -562,7 +587,40 @@ void mode5swbutton(int* swbutton, commonVari *cv){
 		else if( cv->dotIndex == 14 ){
 			c = '*';
 		}
-		cv->strIndex++;
+
+
+		if( ev->isOperator == 0 ){
+			ev->isOperator = 1;
+			sscanf(ev->operand, "%d", &(ev->result));
+			ev->operator = c;
+	  	memset(ev->operand, 0, sizeof(ev->operand));
+	  	cv->strIndex = -1;
+
+		}
+		else{
+			int operand2=0;
+			sscanf(ev->operand, "%d", &operand2);
+			if( ev->operator == '+' ){
+				ev->result += operand2;
+			}
+			else if( ev->operator == '-' ){
+				ev->result -= operand2;
+			}
+			else if( ev->operator == '/' ){
+				if( operand2 != 0 )
+					ev->result /= operand2;
+				else{
+					;//Invalid Expression
+				}
+			}
+			else if( ev->operator == '*' ){
+				ev->result *= operand2;
+			}
+			ev->operator = c;
+		}
+
+		//cv->strIndex++;
+		sprintf(ev->tempStr, "%d%c", ev->result, c);
 		cv->count++;
 	}
   else if( index1 == 4 && index2 == 5 ){
@@ -583,10 +641,6 @@ void mode5swbutton(int* swbutton, commonVari *cv){
   else if( index1 == 7 && index2 == 8 ){
 	  /* pressed sw(8), sw(9) */
 	  /* get answer           */
-		int i=0;
-		for(i=0; i<32; i++){
-
-		}
 		cv->count++;
 	}
 	else{
@@ -604,14 +658,10 @@ void mode5swbutton(int* swbutton, commonVari *cv){
   cv->fndData[2] = temp/10;
   cv->fndData[3] = (temp)%10;
 
-  //if( cv->strIndex > 31 ){
-	    //for( i=0; i<31; i++)
-	      //cv->string[i] = cv->string[i+1];
-	    //cv->strIndex = 31;
-	  
+	ev->operand[ cv->strIndex ] = c;
+	memcpy( cv->string, ev->operand, strlen(ev->operand) );
+	memcpy( cv->string+16, ev->tempStr, strlen(ev->tempStr) );
 
-	if( cv->strIndex != -1 )
-		cv->string[ cv->strIndex ] = c;
 }
 
 int vaildCheck(unsigned char* string){
