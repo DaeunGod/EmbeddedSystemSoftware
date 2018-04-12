@@ -32,9 +32,15 @@ int main(int argc, char* argv[]){
 
   char *readKeyDevice = "/dev/input/event0";
   char *swButtonDevice = "/dev/fpga_push_switch";
-  int shmid = atoi(argv[1]);
+  int shmid = 0;
   int *shmaddr = NULL;
 
+	if( argc < 2 ){
+		printf("Start with process\n");
+		return 1;
+	}
+	/* get shared memory key from parameter */
+	shmid = atoi(argv[1]);
   shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 
   if( (readKeyDesc = open(readKeyDevice, O_RDONLY | O_NONBLOCK)) < 0 ){

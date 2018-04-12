@@ -21,6 +21,15 @@ unsigned char fndData[4];
 unsigned char string[32];
 unsigned char dotTable[10];
 
+/* name: readFromSM
+ * param
+ *  shamddr: shared memory address
+ *  mode: current mode
+ *  ledstat: led value
+ *  dotMat: dot matrix index
+ * desc
+ *  Read data from shared memory
+ */
 void readFromSM(int* shmaddr, int *mode, int *ledstat, int *dotMat){
 	int i;
 	*mode = shmaddr[10];
@@ -37,6 +46,10 @@ void readFromSM(int* shmaddr, int *mode, int *ledstat, int *dotMat){
 	}
 }
 
+/* name: FNDmode1
+ * desc
+ *  write the fnddata on fnd device file 	   
+ */
 void FNDmode1(){
 	char *fndFile = "/dev/fpga_fnd";
 	unsigned char retval;
@@ -57,6 +70,10 @@ void FNDmode1(){
 	close(dev);
 }
 
+/* name: LCD
+ * desc
+ *  write the string on fnd device file
+ */
 void LCD(){
 	char *lcdFile = "/dev/fpga_text_lcd";
 	int dev = open(lcdFile, O_WRONLY);
@@ -70,6 +87,12 @@ void LCD(){
 	close(dev);
 }
 
+/* name: LED
+ * param
+ *  n: led value [0~255]
+ * desc
+ *  using mmap to write the led value on led device address 	   
+ */
 void LED(int n){
 	int fd;
 
@@ -104,6 +127,14 @@ void LED(int n){
 	close(fd);
 }
 
+/* name: Dot
+ * param
+ *  dotMatrix: dot matrix index, [0~9]: numbers, [10]: 'a', [11~14]: '+', '-', '/', '*'
+ * desc
+ *  if dotMatrix == -1: clear
+ *  if dotMatrix == -2: using the dotTable to draw operator
+ *  else: draw numbers or 'A'
+ */
 void Dot(int dotMatrix){
 	int dev = open("/dev/fpga_dot", O_WRONLY);
 	int size;
@@ -128,34 +159,22 @@ void Dot(int dotMatrix){
 	close(dev);
 }
 
-void Dot2(){
-	int dev = open("/dev/fpga_dot", O_WRONLY);
-	int size;
-	int i;
-	if( dev < 0 ){
-		perror("Dot Matrix");
-		close(dev);
-		return ;
-	}
-
-	size = sizeof(dotTable);
-	for(i=0; i<10; i++)
-		printf("dot %d: %x\n", i, dotTable[i]);
-	write(dev, dotTable, size);
-
-	close(dev);
-}
-
-
 int main(int argc, char* argv[]){
   key_t key;
-  int shmid = atoi(argv[1]);
+  int shmid = 0;
   int *shmaddr = NULL;
 	int mode=0, ledstat=0, dotMatrix;
 	time_t initTime, currentTime;
+
+	if( argc < 2 ){
+		printf("Start with process\n");
+		return 1;
+	
+	}
 	time(&initTime);
 	time(&currentTime);
 
+	shmid = atoi(argv[1]);
   shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
 	readFromSM(shmaddr, &mode, &ledstat, &dotMatrix); // Initialize
 	LCD();

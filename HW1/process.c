@@ -20,6 +20,20 @@
 
 #define MAX_MODE 5
 
+/* 
+ * struct commonVari
+ * dsec: Variables that used every modes
+ *
+ * curMode: what is current mode
+ * initTime: initialize the time into system time
+ * elapsedTime: for calculate the elapsed time from initTime
+ * fndData: data that show on fnd
+ * string: data that show on lcd
+ * strIndex: string index
+ * ledValue: led data, [0-255]
+ * dotIndex: data that show on dot matrix, [0-9]:numbers, [10]:'A', [11~14]:'+', '-', '/', '*'
+ * count: how many times the switch button pressed
+ */
 typedef struct{
 	int curMode;
 	struct tm *initTime;
@@ -32,6 +46,18 @@ typedef struct{
 	int count;
 }commonVari;
 
+/*
+ * struct drawDotVari
+ * desc: Variables that need to mode4
+ *
+ * table: data that show on dot matrix
+ * tableCheck: actual data that user draws
+ * dotRow: current cursor row
+ * dotCol: current cursor col
+ * isVisible: 1 cursor is visible
+							0 cursor is not visible
+ * count: how many times the switch button pressed
+ */
 typedef struct{
 		unsigned char table[10];
 		unsigned char tableCheck[10];
@@ -41,6 +67,17 @@ typedef struct{
 		int count;
 }drawDotVari;
 
+/*
+ * struct extraVari
+ * desc: Variables that need to mode5
+ * 
+ * operand: data that current operand
+ * tempStr: data that will write on second line lcd
+ * operator: current operator
+ * result: save a calculated data
+ * isOperator: 1 when user put the operators '+', '-', '/', '*'
+								0 initial value or when user put the operator '='
+ */
 typedef struct{
 	unsigned char operand[16];
 	unsigned char tempStr[16];
@@ -49,6 +86,292 @@ typedef struct{
 	int isOperator;
 }extraVari;
 
+/* name: commonVariInit
+ * desc: Initialize commonVari variable according to current mode
+ *
+ * return: none
+ * param
+ *  cv: variable that is going to be initialize
+ *  mode: current mode
+ */
+void commomVariInit( commonVari *cv, int mode );
+
+/* name: drawDotVariInit
+ * desc: Initialize drawDotVari variable
+ *
+ * return: none
+ * param
+ *  ddv: variable that is going to be initialize
+ */
+void drawDotVariInit( drawDotVari *ddv );
+
+/* name: extraVariInit
+ * desc: Initialize extraVari variable
+ *
+ * return: none
+ * param
+ *  ev: variable that is going to be initialize
+ */
+void extraVariInit( extraVari *ev );
+
+/* name: mode1swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  cv: common variables
+ * desc
+ *  if swbutton[0] == 1: flip time editing flag
+ *  if time editing flag == 1:
+ *    if swbutton[1] == 1: reset the time into local time
+ *    if swbutton[2] == 1: increase 1 hour
+ *    if swbutton[3] == 1: increase 1 min
+ */
+void mode1swbutton(int* swbutton, commonVari *cv);
+
+/* name: mode2swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  cv: common variables
+ * desc
+ *  if swbutton[0] == 1: change a number into decimal, octal, quaternion, binary
+ *  if swbutton[1] == 1: increase hundred digits
+ *  if swbutton[2] == 1: increase ten digits
+ *  if swbutton[3] == 1: increase one digits
+ */
+void mode2swbutton(int* swbutton, commonVari *cv);
+
+/* name: mode3swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  cv: common variables
+ * desc
+ *  if swbutton[0~8] == 1: put the character or number in string
+ *  if swbutton[1] == 1 && swbutton[2] == 1: clear the string
+ *  if swbutton[4] == 1 && swbutton[5] == 1: Change input mode, character or number
+ *  if swbutton[7] == 1 && swbutton[8] == 1: put a space in string
+ */
+void mode3swbutton(int* swbutton, commonVari *cv);
+
+/* name: mode4swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  ddv: draw Dot matrix variables
+ *  cv: common variables
+ * desc
+ *  if swbutton[1, 3, 5, 7] == 1: move the cursor up, left, right, down
+ *  if swbutton[4] == 1: Mark the position of cursor(set)
+ *  if swbutton[0] == 1: clear and reset
+ *  if swbutton[2] == 1: set the visibility of cursor [0, 1]
+ *  if swbutton[6] == 1: clear the data but cursor position
+ *  if swbutton[8] == 1: reverse every data on the dot matrix
+ */
+void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv);
+
+/* name: mode5swbutton
+ * return: none
+ * param
+ *  swbutton: information of sw button pressed 
+ *  cv: common variables
+ *  ev: extra variables
+ * desc
+ *  if swbutton[0~8] == 1: put the numbers in operand
+ *  if swbutton[0] == 1 && swbutton[1] == 1: clear
+ *  if swbutton[3] == 1 && swbutton[4] == 1: choose the current operator
+ *  if swbutton[4] == 1 && swbutton[5] == 1: put the zero in operand
+ *  if swbutton[6] == 1 && swbutton[7] == 1: change the operator
+ *  if swbutton[7] == 1 && swbutton[8] == 1: get the answer
+ */
+void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev);
+
+/* name: setBit
+ * return: none
+ * param
+ *  data: data that set or clear a bit, 
+ *  n: n-th position
+ *  setOrClear: 1 set
+								0 clear
+ * desc
+ *  set or clear a n-th bit
+ */
+void setBit(unsigned char *data, int n, int setOrClear);
+
+/* name: flipBit
+ * return: none
+ * param
+ *  data: origin data
+ * desc
+ *  every bits in data will be flipped
+ */
+void flipBit(unsigned char *data);
+
+/* name: calculate
+ * return: none
+ * param
+ *  operator: current operator, '+', '-', '/', '*'
+ *  result: operand of left side and result of evaluation
+ *  operand: operand of right side
+ * desc
+ *  evaluate the result according to operator
+ */
+int calculate(unsigned char operator, int* result, int operand);
+
+/* name: setOperator
+ * return: none
+ * param
+ *  dotIndex: dot Matrix index, [11~14]
+ *  operator: '+', '-', '/', '*'
+ * desc
+ *  set the operator according to dotIndex
+ */
+void setOperator(int dotIndex, unsigned char *operator);
+
+int main(){
+  int inputProcId, outputProcId;
+  key_t key;
+  int shmid;
+  int *shmaddr = NULL;
+	char shmidChar[256];
+
+  /* make a key to create shared memory */
+  key = ftok("/data", 1);
+  shmid = shmget(key, 1024, IPC_CREAT|0644);
+	sprintf(shmidChar, "%d", shmid);
+  if( shmid == -1 ){
+    perror("shmget");
+    exit(1);
+  }
+
+  if( (inputProcId = fork()) < 0 ){
+    perror("fork error");
+    exit(1);
+  }
+  else if( inputProcId == 0 ){ 
+    /* -MARK: input Process */
+    /* pass the key to child process */
+		char *argv[] = {"./reader", shmidChar, NULL};
+		execv(argv[0], argv);
+  }
+  else{
+    /* variables
+     *  processingChild, status: when parents process die, check the child process still running
+     *  mode: current mode
+		 *  startTime, endTiem: to calculate input time
+		 *  cv: common variables for every modes
+		 *  ddv: draw dot matrix variables for mode4
+		 *  ev: extra variables for mode5
+     */
+    int processingChild, status;
+		int mode = 1;
+		struct timeval startTime, endTime;
+		commonVari cv;
+		drawDotVari ddv;
+		extraVari ev;
+		
+		gettimeofday(&startTime, NULL);
+		commomVariInit( &cv, mode );
+		drawDotVariInit( &ddv );
+		extraVariInit( &ev );
+
+    /* mapping the shared memory address */
+    shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
+
+    if( (outputProcId = fork()) < 0 ){
+      perror("fork error");
+      exit(1);
+    }
+    else if( outputProcId == 0 ){ 
+      /* -MARK: output Process */
+      /* pass the key to child process */
+			char *argv[] = {"./writer", shmidChar, NULL};
+			execv(argv[0], argv);
+    }
+
+		/* -MARK: main Process */
+    while(1){
+      int pressedKey = shmaddr[0];
+			int swbutton[9]={0};
+			int i;
+			long msec = 0;
+			gettimeofday(&endTime, NULL);
+			
+			/* this is for delay */
+			msec = (endTime.tv_sec-startTime.tv_sec)*1000+(endTime.tv_usec-startTime.tv_usec)/1000;
+			if( msec >= 200 )
+				startTime = endTime;
+			else
+				continue;
+
+      /* get the information about sw button pressed */
+			for(i=0; i<MAX_BUTTON; i++)
+				swbutton[i] = shmaddr[1+i];
+
+			printf("mode: %d\n ", cv.curMode);
+      if( pressedKey == 158 ){
+        /* function button(back) pressed */
+				/* Quit */
+        break;
+      }
+      else if( pressedKey == 116 ){
+        /* function button(proc) pressed */
+      }
+      else if( pressedKey == 115 ){
+        /* function button(vol+) pressed */
+				/* Mode Change +, Initialize every variables */
+				mode = (mode)%MAX_MODE+1;
+				commomVariInit( &cv, mode );
+				drawDotVariInit( &ddv );
+				extraVariInit( &ev );
+      }
+      else if( pressedKey == 114 ){
+        /* function button(vol-) pressed */
+				/* Mode Change -, Initialize every variables */
+				mode--;
+				if( mode < 1 )
+					mode =  MAX_MODE;
+				commomVariInit( &cv, mode );
+				drawDotVariInit( &ddv );
+				extraVariInit( &ev );
+      }
+
+      /* calculate something according to the mode*/
+			if( mode == 1 )
+				mode1swbutton(swbutton, &cv);
+			else if( mode == 2 )
+				mode2swbutton(swbutton, &cv);
+			else if( mode == 3 )
+				mode3swbutton(swbutton, &cv);
+			else if( mode == 4 )
+				mode4swbutton( swbutton, &ddv, &cv );
+			else if( mode == 5 )
+				mode5swbutton( swbutton, &cv, &ev );
+			
+
+      /* write the data on shared memory for output */
+			shmaddr[10] = cv.curMode;
+			shmaddr[11] = cv.ledValue;
+			for(i=0; i<4; i++)
+				shmaddr[ FND_START +i] = cv.fndData[i];
+			for(i=0; i<32; i++)
+				shmaddr[ STR_START +i] = cv.string[i];
+			shmaddr[48] = cv.dotIndex;
+			for(i=0; i<10; i++)
+				shmaddr[DOTTABLE_START+i] = ddv.table[i];
+    }
+
+    //prctl(PR_SET_PDEATHSIG, SIGTERM);
+		kill(inputProcId, SIGTERM);
+		kill(outputProcId, SIGTERM);
+    /* waiting for running child*/
+    while( (processingChild = wait(&status)) > 0 );
+  }
+	shmdt((int*)shmaddr);
+	shmctl(shmid, IPC_RMID, (struct shmid_ds*)NULL);
+	return 0;
+}
+
 void commomVariInit( commonVari *cv, int mode ){
 	time_t t = time(NULL);
 
@@ -56,7 +379,7 @@ void commomVariInit( commonVari *cv, int mode ){
 	cv->initTime = localtime(&t);
 	time(&(cv->elapsedTime));
 	memset(cv->fndData, 0, sizeof(cv->fndData));
-	strcpy(cv->string, "Hello           World         \0");
+	strcpy(cv->string, "Hello           World           \0");
 	cv->strIndex = -1;
 	cv->ledValue = 0;
 	cv->dotIndex = 0;
@@ -94,197 +417,7 @@ void extraVariInit( extraVari *ev ){
 	ev->isOperator = 0;
 }
 
-/* name: mode1swbutton
- * return: time editing flag, false or true
- * param
- *  swbutton: information of sw button pressed 
- *  tm_ptr: structure that contains current time information 
- *  fndData: data that show on the FND
- * desc
- *  if swbutton[0] == 1: flip time editing flag
- *  if time editing flag == 1:
- *    if swbutton[1] == 1: reset time that local
- *    if swbutton[2] == 1: increase 1 hour
- *    if swbutton[3] == 1: increase 1 min
- *                                                */
-int mode1swbutton(int* swbutton, commonVari *cv);
-
-/* name: mode2swbutton
- * return: none
- * param
- *  swbutton: information of sw button pressed 
- *  fndData: data that show on the FND
- *  number: one of 10, 8, 4, 2
- * desc
- *  if swbutton[0] == 1: change a number into decimal, octal, quaternion, binary
- *  if swbutton[1] == 1: increase hundred digits
- *  if swbutton[2] == 1: increase ten digits
- *  if swbutton[3] == 1: increase one digits
- *                                            */
-void mode2swbutton(int* swbutton, commonVari *cv);
-void mode3swbutton(int* swbutton, commonVari *cv);
-void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv);
-void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev);
-void setBit(unsigned char *data, int n, int setOrClear);
-void flipBit(unsigned char *data);
-int calculate(unsigned char operator, int* result, int operand);
-void setOperator(int dotIndex, unsigned char *operator);
-
-int main(){
-  int inputProcId, outputProcId;
-  key_t key;
-  int shmid;
-  int *shmaddr = NULL;
-	char shmidChar[256];
-
-  /* make a key to create shared memory */
-  key = ftok("/data", 1);
-  shmid = shmget(key, 1024, IPC_CREAT|0644);
-	sprintf(shmidChar, "%d", shmid);
-  if( shmid == -1 ){
-    perror("shmget");
-    exit(1);
-  }
-
-  if( (inputProcId = fork()) < 0 ){
-    perror("fork error");
-    exit(1);
-  }
-  else if( inputProcId == 0 ){ 
-    /* -MARK: input Process */
-    /* pass the key to child process */
-		char *argv[] = {"./reader", shmidChar, NULL};
-		execv(argv[0], argv);
-  }
-  else{
-    /* variables
-     *  processingChild, status: when parents process die, check the child process still running
-     *  mode: current mode
-     *  tm_ptr: current time
-     *  fndData: Data that show on FND
-     *  string: string that show on LCD
-     *  strIndex: index for string. use this variable in mode3
-     *  ledstat: data for led value
-     *  dotMatrix: data for dotMatrix value
-     * */
-    int processingChild, status;
-		int mode = 1;
-		struct timeval startTime, endTime;
-		commonVari cv;
-		drawDotVari ddv;
-		extraVari ev;
-		
-		gettimeofday(&startTime, NULL);
-		commomVariInit( &cv, mode );
-		drawDotVariInit( &ddv );
-		extraVariInit( &ev );
-
-    /* mapping the shared memory address */
-    shmaddr = (int*)shmat(shmid, (int*)NULL, 0);
-
-    if( (outputProcId = fork()) < 0 ){
-      perror("fork error");
-      exit(1);
-    }
-    else if( outputProcId == 0 ){ 
-      /* -MARK: output Process */
-      /* pass the key to child process */
-			char *argv[] = {"./writer", shmidChar, NULL};
-			execv(argv[0], argv);
-    }
-
-		/* -MARK: main Process */
-    while(1){
-      int pressedKey = shmaddr[0];
-			int swbutton[9]={0};
-			int i;
-			long msec = 0;
-			gettimeofday(&endTime, NULL);
-			
-			msec = (endTime.tv_sec-startTime.tv_sec)*1000+(endTime.tv_usec-startTime.tv_usec)/1000;
-			if( msec >= 400 )
-				startTime = endTime;
-			else
-				continue;
-
-      /* get the information about sw button pressed */
-			for(i=0; i<MAX_BUTTON; i++)
-				swbutton[i] = shmaddr[1+i];
-
-			printf("mode: %d\n ", cv.curMode);
-      if( pressedKey == 158 ){
-        /* function button(back) pressed */
-				/* Quit */
-        break;
-      }
-      else if( pressedKey == 116 ){
-        /* function button(proc) pressed */
-      }
-      else if( pressedKey == 115 ){
-        /* function button(vol+) pressed */
-				/* Mode Change + */
-				mode = (mode)%MAX_MODE+1;
-				commomVariInit( &cv, mode );
-				drawDotVariInit( &ddv );
-				extraVariInit( &ev );
-      }
-      else if( pressedKey == 114 ){
-        /* function button(vol-) pressed */
-				/* Mode Change - */
-				mode--;
-				if( mode < 1 )
-					mode =  MAX_MODE;
-				commomVariInit( &cv, mode );
-				drawDotVariInit( &ddv );
-				extraVariInit( &ev );
-      }
-
-      /* calculate something according to the mode*/
-			if( mode == 1 ){
-				mode1swbutton(swbutton, &cv);
-			}
-			else if( mode == 2 ){
-				mode2swbutton(swbutton, &cv);
-			}
-			else if( mode == 3 ){
-				mode3swbutton(swbutton, &cv);
-			}
-			else if( mode == 4 ){
-				mode4swbutton( swbutton, &ddv, &cv );
-			}
-			else if( mode == 5 ){
-				mode5swbutton( swbutton, &cv, &ev );
-			}
-
-      /* write the data on shared memory for output */
-			shmaddr[10] = cv.curMode;
-			shmaddr[11] = cv.ledValue;
-			for(i=0; i<4; i++){
-				shmaddr[ FND_START +i] = cv.fndData[i];
-			}
-			for(i=0; i<32; i++){
-				shmaddr[ STR_START +i] = cv.string[i];
-			}
-			shmaddr[48] = cv.dotIndex;
-			for(i=0; i<10; i++){
-				shmaddr[DOTTABLE_START+i] = ddv.table[i];
-			}
-
-    }
-
-    //prctl(PR_SET_PDEATHSIG, SIGTERM);
-		kill(inputProcId, SIGTERM);
-		kill(outputProcId, SIGTERM);
-
-    /* waiting for running child*/
-    while( (processingChild = wait(&status)) > 0 );
-  }
-	shmdt((int*)shmaddr);
-	shmctl(shmid, IPC_RMID, (struct shmid_ds*)NULL);
-	return 0;
-}
-
-int mode1swbutton(int* swbutton, commonVari *cv){
+void mode1swbutton(int* swbutton, commonVari *cv){
 	static unsigned char deltaTime[2] = {0};
 	time_t t = time(NULL);
 	unsigned char hour, min;
@@ -292,18 +425,24 @@ int mode1swbutton(int* swbutton, commonVari *cv){
 		cv->ledValue = !(cv->ledValue);
 	}
 	cv->initTime = localtime(&t);
+
 	if( cv->ledValue == 1 ){
+		/* when user enter the time change mode */
 		if( swbutton[1] == KEY_PRESS ){
+			/* reset into local time */
 			cv->initTime = localtime(&t);
 			deltaTime[0] = deltaTime[1] = 0;
 		}
 		if( swbutton[2] == KEY_PRESS ){
+			/* increase 1 hour */
 			deltaTime[0]++;
 		}
 		if( swbutton[3] == KEY_PRESS ){
+			/* increase 1 min */
 			deltaTime[1]++;
 		}
 	}
+
 	hour = cv->initTime->tm_hour + deltaTime[0];
 	min = cv->initTime->tm_min + deltaTime[1];
 	if( min >= 60 ){
@@ -318,14 +457,12 @@ int mode1swbutton(int* swbutton, commonVari *cv){
 	cv->fndData[1] = hour%10;
 	cv->fndData[2] = min/10;
  	cv->fndData[3] = min%10;
-
-	return 0;
 }
 
 void mode2swbutton(int* swbutton, commonVari *cv){
 	int temp=0;
 	if(cv->ledValue == 0 ){
-		printf("divider is zeor\n");
+		printf("divider is zero\n");
 		return ;
 	}
 
@@ -554,7 +691,6 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 	}
 
 	memset(cv->string, ' ', sizeof(cv->string));
-	printf("%d %d %d\n", index1, index2, c);
   if( index1 == 1 && index2 == 2 ){
 		/* pressed sw(2), sw(3) */
 	  /* clear string         */
