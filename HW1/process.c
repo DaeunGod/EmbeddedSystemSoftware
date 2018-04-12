@@ -89,7 +89,7 @@ void drawDotVariInit( drawDotVari *ddv ){
 void extraVariInit( extraVari *ev ){
 	memset(ev->operand, 0, sizeof(ev->operand));
 	memset(ev->tempStr, 0, sizeof(ev->tempStr));
-	ev->operator = 0;
+	ev->operator = '+';
 	ev->result = 0;
 	ev->isOperator = 0;
 }
@@ -127,6 +127,8 @@ void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv);
 void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev);
 void setBit(unsigned char *data, int n, int setOrClear);
 void flipBit(unsigned char *data);
+int calculate(unsigned char operator, int* result, int operand);
+void setOperator(int dotIndex, unsigned char *operator);
 
 int main(){
   int inputProcId, outputProcId;
@@ -172,7 +174,6 @@ int main(){
 		drawDotVari ddv;
 		extraVari ev;
 		
-		//time(&(elapsedTime));
 		gettimeofday(&startTime, NULL);
 		commomVariInit( &cv, mode );
 		drawDotVariInit( &ddv );
@@ -203,13 +204,9 @@ int main(){
 			msec = (endTime.tv_sec-startTime.tv_sec)*1000+(endTime.tv_usec-startTime.tv_usec)/1000;
 			if( msec >= 400 )
 				startTime = endTime;
-				//continue;
 			else
 				continue;
-			//time_t currentTime;
-			//time(&(currentTime));
-			//if( currentTime - elapsedTime > 
-      //usleep(400000);
+
       /* get the information about sw button pressed */
 			for(i=0; i<MAX_BUTTON; i++)
 				swbutton[i] = shmaddr[1+i];
@@ -297,7 +294,6 @@ int mode1swbutton(int* swbutton, commonVari *cv){
 	cv->initTime = localtime(&t);
 	if( cv->ledValue == 1 ){
 		if( swbutton[1] == KEY_PRESS ){
-			//commomVariInit( cv, 1 );
 			cv->initTime = localtime(&t);
 			deltaTime[0] = deltaTime[1] = 0;
 		}
@@ -442,8 +438,6 @@ void mode3swbutton(int* swbutton, commonVari *cv){
 	}
 	if( cv->strIndex != -1 )
 		cv->string[ cv->strIndex ] = c;
-
-	//printf("str %s ind %d\n", cv->string, cv->strIndex);
 }
 
 void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv){
@@ -547,7 +541,7 @@ void flipBit(unsigned char *data){
 void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 	int index1=-1, index2=-1;
   int i;
-  static char c;
+  static char c = -1;
   int temp;
 
   for(i=0; i<9; i++){
@@ -559,68 +553,37 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 		}
 	}
 
-	printf("%d %d\n", index1, index2);
+	memset(cv->string, ' ', sizeof(cv->string));
+	printf("%d %d %d\n", index1, index2, c);
   if( index1 == 1 && index2 == 2 ){
 		/* pressed sw(2), sw(3) */
 	  /* clear string         */
 	  memset(cv->string, ' ', sizeof(cv->string));
-	  memset(ev->operand, 0, sizeof(ev->operand));
-	  memset(ev->tempStr, 0, sizeof(ev->tempStr));
+		extraVariInit( ev );
 		cv->count ++;
 	  cv->strIndex = -1;
-	  cv->strIndex = 0;
-		ev->operator = 0;
-		ev->isOperator = 0;
+		cv->dotIndex = 11;
+		c = ' ';
 	}
 	else if( index1 == 3 && index2 == 4 ){
 	  /* pressed sw(5), sw(6) */
 	  /* put operator					*/
-		if( cv->dotIndex == 11 ){
-			c = '+'	;
-		}
-		else if( cv->dotIndex == 12 ){
-			c = '-';
-		}
-		else if( cv->dotIndex == 13 ){
-			c = '/';
-		}
-		else if( cv->dotIndex == 14 ){
-			c = '*';
-		}
-
-
 		if( ev->isOperator == 0 ){
 			ev->isOperator = 1;
 			sscanf(ev->operand, "%d", &(ev->result));
-			ev->operator = c;
-	  	memset(ev->operand, 0, sizeof(ev->operand));
-	  	cv->strIndex = -1;
-
 		}
 		else{
-			int operand2=0;
+			int operand2=0, res = 0;
 			sscanf(ev->operand, "%d", &operand2);
-			if( ev->operator == '+' ){
-				ev->result += operand2;
+			res = calculate(ev->operator, &ev->result, operand2);
+			if( res == -1 ){
+				sprintf(ev->tempStr, "Dvide by zero");
+				c = -1;
 			}
-			else if( ev->operator == '-' ){
-				ev->result -= operand2;
-			}
-			else if( ev->operator == '/' ){
-				if( operand2 != 0 )
-					ev->result /= operand2;
-				else{
-					;//Invalid Expression
-				}
-			}
-			else if( ev->operator == '*' ){
-				ev->result *= operand2;
-			}
-			ev->operator = c;
 		}
 
-		//cv->strIndex++;
-		sprintf(ev->tempStr, "%d%c", ev->result, c);
+	  memset(ev->operand, 0, sizeof(ev->operand));
+	  cv->strIndex = -1;
 		cv->count++;
 	}
   else if( index1 == 4 && index2 == 5 ){
@@ -636,16 +599,36 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 		cv->dotIndex++;
 		if( cv->dotIndex > 14 )
 			cv->dotIndex = 11;
+
+		setOperator(cv->dotIndex, &(ev->operator));
 		cv->count++;
 	}
   else if( index1 == 7 && index2 == 8 ){
 	  /* pressed sw(8), sw(9) */
 	  /* get answer           */
+		int operand2=0, res=0;
+		sscanf(ev->operand, "%d", &operand2);
+		res = calculate(ev->operator, &ev->result, operand2);
+		if( res == -1 ){
+			sprintf(ev->tempStr, "Dvide by zero");
+			c = -1;
+		}
+
+	  memset(ev->operand, 0, sizeof(ev->operand));
+	  cv->strIndex = -1;
+		ev->operator = ' ';
+		ev->isOperator = 0;
+
 		cv->count++;
 	}
 	else{
 		if( index1 != -1 ){
 			c = (index1+1)+'0';
+			if( ev->operator == ' ' ){
+				/* after you get answer make result zero and show operator again */
+				setOperator(cv->dotIndex, &(ev->operator));
+				ev->result = 0;
+			}
 			cv->strIndex++;
 			cv->count++;
 		}
@@ -658,65 +641,39 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
   cv->fndData[2] = temp/10;
   cv->fndData[3] = (temp)%10;
 
-	ev->operand[ cv->strIndex ] = c;
+	if( c != 255 ){
+		ev->operand[ cv->strIndex ] = c;
+		sprintf(ev->tempStr, "%d%c", ev->result, ev->isOperator ? (ev->operator) : ' ');
+	}
 	memcpy( cv->string, ev->operand, strlen(ev->operand) );
 	memcpy( cv->string+16, ev->tempStr, strlen(ev->tempStr) );
-
 }
 
-int vaildCheck(unsigned char* string){
-	int isOperator=0;
-	char operand[32]={0};
-	char operators[16]={0};
-	char operands[16]={0};
-	int operatorCount=0;
-	int operandCount=0;
-	int cnt = 0;
-	int i, j;
-	int result = 0;
-
-	if( (string[0] < '0' || string[0] > '9') )
-		return 0;
-
-	for(i=0; i<32; i++){
-		if( string[i] == ' ' || string[i] == '\0' )
-			break;
-
-		if( string[i] >= '0' && string[i] <= '9' ){
-			operand[cnt++] = string[i];
-			isOperator = 0;
-		}
+int calculate(unsigned char operator, int* result, int operand){
+	if( operator == '+' )
+		*(result) += operand;
+	else if( operator == '-' )
+		*(result) -= operand;
+	else if( operator == '/' ){
+		if( operand != 0 )
+			*(result) /= operand;
 		else{
-			if( isOperator == 1 )
-				return 0;
-
-			if( string[i] != '+' || string[i] != '-' ||
-					string[i] != '/' || string[i] != '*' )
-				return 0;
-			
-			operators[operatorCount++] = string[i];
-			sscanf(operand, "%d", &operands[operandCount++]);
-			isOperator = 1;
-			cnt = 0;
-
-			memset(operand, 0, sizeof(operand));
+			return -1;//Invalid Expression
 		}
 	}
+	else if( operator == '*' )
+		*(result) *= operand;
 
+	return 0;
+}
 
-	result = operands[j++];
-	for(i=0; i<operatorCount; i++){
-		if( operators[i] == '+' ){
-			result += operands[j+1];
-		}
-		else if( operators[i] == '-' ){
-			result += operands[j] + operands[j+1];
-		}
-		else if( operators[i] == '/' ){
-			result += operands[j] + operands[j+1];
-		}
-		else if( operators[i] == '*' ){
-			result += operands[j] + operands[j+1];
-		}
-	}
+void setOperator(int dotIndex, unsigned char *operator){
+		if( dotIndex == 11 )
+			*operator = '+'	;
+		else if( dotIndex == 12 )
+			*operator = '-';
+		else if( dotIndex == 13 )
+			*operator = '/';
+		else if( dotIndex == 14 )
+			*operator = '*';
 }

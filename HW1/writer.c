@@ -100,7 +100,6 @@ void LED(int n){
 
 	*led_addr = n;
 
-	//sleep(1);
 	munmap(led_addr, 4096);
 	close(fd);
 }
@@ -144,7 +143,6 @@ void Dot2(){
 		printf("dot %d: %x\n", i, dotTable[i]);
 	write(dev, dotTable, size);
 
-	//sleep(1);
 	close(dev);
 }
 
@@ -166,7 +164,6 @@ int main(int argc, char* argv[]){
 	while(1){
 		readFromSM(shmaddr, &mode, &ledstat, &dotMatrix);
 		FNDmode1();
-		//Dot(-1);
 		if( mode == 1 ){
 			time(&currentTime);
 			Dot(-1);
@@ -208,7 +205,6 @@ int main(int argc, char* argv[]){
 			Dot(-2);
 		}
 		else if( mode == 5 ){
-			//printf("dot mat : %d\n", dotMatrix);
 			Dot(dotMatrix);
 		}
 

@@ -21,4 +21,4 @@ writer : writer.o
 
 
 clean :
-	rm -i *.o reader process writer
+	rm *.o reader process writer
