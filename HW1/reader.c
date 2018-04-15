@@ -1,4 +1,4 @@
-#include "reader.h"
+//#include "reader.h"
 #include <linux/input.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -16,6 +16,9 @@
 #include <sys/types.h>
 
 #define BUFF_SIZE 64
+#define MAX_BUTTON 9
+#define KEY_PRESS 1
+#define KEY_RELEASE 0
 
 unsigned char quit = 0;
 

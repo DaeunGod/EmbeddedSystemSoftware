@@ -9,6 +9,7 @@
 #include <signal.h>
 
 #include <time.h>
+#include <limits.h>
 
 #define MAX_BUTTON 9
 #define KEY_PRESS 1
@@ -521,6 +522,8 @@ void mode3swbutton(int* swbutton, commonVari *cv){
 		memset(cv->string, ' ', sizeof(unsigned char) * 32);
 		cv->count ++;
 		cv->strIndex = -1;
+		clickCnt = 0;
+		clickedBefore = -1;
 	}
 	else if( index1 == 4 && index2 == 5 ){
 		/* pressed sw(5), sw(6) */
@@ -627,7 +630,7 @@ void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv){
 		ddv->dotRow = 1;
 		ddv->dotCol = 0;
 		memset(ddv->tableCheck, 0, sizeof(ddv->tableCheck));
-		ddv->count = 0;
+		//ddv->count = 0;
 	}
 
 	if( swbutton[2] == KEY_PRESS ){
@@ -653,8 +656,8 @@ void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv){
 	memcpy( ddv->table, ddv->tableCheck, sizeof(ddv->table) );
 	if( ddv->isVisible == 1 )
 		setBit( &(ddv->table[ddv->dotCol]), 7-ddv->dotRow, isblink );
-	else
-		setBit( &(ddv->table[ddv->dotCol]), 7-ddv->dotRow, 0 );
+	//else
+		//setBit( &(ddv->table[ddv->dotCol]), 7-ddv->dotRow, 0 );
 
 	temp = ddv->count;
 	temp = (temp)%1000;
@@ -666,7 +669,7 @@ void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv){
 
 void setBit(unsigned char *data, int n, int setOrClear){
 	if( setOrClear )
-		(*data) |= (1 << (n));
+		(*data) ^= (1 << (n));
 	else
 		(*data) &= ~(1 << (n));
 }
@@ -678,7 +681,7 @@ void flipBit(unsigned char *data){
 void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 	int index1=-1, index2=-1;
   int i;
-  static char c = -1;
+  static char c = ' ';
   int temp;
 
   for(i=0; i<9; i++){
@@ -698,7 +701,8 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 		extraVariInit( ev );
 		cv->count ++;
 	  cv->strIndex = -1;
-		cv->dotIndex = 11;
+		//cv->dotIndex = 11;
+		setOperator(cv->dotIndex, &(ev->operator));
 		c = ' ';
 	}
 	else if( index1 == 3 && index2 == 4 ){
@@ -714,6 +718,10 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 			res = calculate(ev->operator, &ev->result, operand2);
 			if( res == -1 ){
 				sprintf(ev->tempStr, "Dvide by zero");
+				c = -1;
+			}
+			else if( res == -2 ){
+				sprintf(ev->tempStr, "Overflow");
 				c = -1;
 			}
 		}
@@ -747,6 +755,10 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 		res = calculate(ev->operator, &ev->result, operand2);
 		if( res == -1 ){
 			sprintf(ev->tempStr, "Dvide by zero");
+			c = -1;
+		}
+		else if( res == -2 ){
+			sprintf(ev->tempStr, "Overflow");
 			c = -1;
 		}
 
@@ -786,10 +798,17 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 }
 
 int calculate(unsigned char operator, int* result, int operand){
+	double temp = *(result);
 	if( operator == '+' )
-		*(result) += operand;
+		if( temp + operand > INT_MAX )
+			return -2;
+		else
+			*(result) += operand;
 	else if( operator == '-' )
-		*(result) -= operand;
+		if( temp - operand < INT_MIN )
+			return -2;
+		else
+			*(result) -= operand;
 	else if( operator == '/' ){
 		if( operand != 0 )
 			*(result) /= operand;
@@ -797,8 +816,12 @@ int calculate(unsigned char operator, int* result, int operand){
 			return -1;//Invalid Expression
 		}
 	}
-	else if( operator == '*' )
-		*(result) *= operand;
+	else if( operator == '*' ){
+		if( temp * operand > INT_MAX )
+			return -2;
+		else
+			*(result) *= operand;
+	}
 
 	return 0;
 }
