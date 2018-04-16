@@ -565,7 +565,9 @@ void mode3swbutton(int* swbutton, commonVari *cv){
 		}
 	}
 	temp = cv->count;
-	temp = (temp)%1000;
+	temp = (temp)%10000;
+  cv->fndData[0] = (temp)/1000;
+  temp = temp%1000;
 	cv->fndData[1] = (temp)/100;
 	temp = temp%100;
 	cv->fndData[2] = temp/10;
@@ -660,7 +662,9 @@ void mode4swbutton(int* swbutton, drawDotVari *ddv, commonVari *cv){
 		//setBit( &(ddv->table[ddv->dotCol]), 7-ddv->dotRow, 0 );
 
 	temp = ddv->count;
-	temp = (temp)%1000;
+	temp = (temp)%10000;
+  cv->fndData[0] = (temp)/1000;
+  temp = temp%1000;
 	cv->fndData[1] = (temp)/100;
 	temp = temp%100;
 	cv->fndData[2] = temp/10;
@@ -783,7 +787,9 @@ void mode5swbutton(int* swbutton, commonVari *cv, extraVari *ev){
 	}
 
   temp = cv->count;
-  temp = (temp)%1000;
+	temp = (temp)%10000;
+  cv->fndData[0] = (temp)/1000;
+  temp = temp%1000;
   cv->fndData[1] = (temp)/100;
   temp = temp%100;
   cv->fndData[2] = temp/10;
