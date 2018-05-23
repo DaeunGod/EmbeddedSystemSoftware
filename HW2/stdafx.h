@@ -1,5 +1,20 @@
 #ifndef __FPGA_DOT_DRIVER__
 #define __FPGA_DOOT_DRIVER__
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/platform_device.h>
+#include <linux/delay.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
+#include <linux/kernel.h>
+#include <linux/ioport.h>
+#include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/version.h>
 
 ///----------------------------------DOT-------------------------------------///
 #define IOM_FPGA_DOT_MAJOR 262        // ioboard led device major number
@@ -44,10 +59,5 @@ ssize_t iom_led_write(struct file *inode, const char *gdata, size_t length, loff
 ssize_t iom_led_read(struct file *inode, char *gdata, size_t length, loff_t *off_what);
 int iom_led_open(struct inode *minode, struct file *mfile);
 int iom_led_release(struct inode *minode, struct file *mfile);
-
-///------------------------------------TEXT---------------------------------------///
-#define MAX_BUFF 32
-#define LINE_BUFF 16
-#define FPGA_TEXT_LCD_DEVICE "/dev/fpga_text_lcd"
 
 #endif

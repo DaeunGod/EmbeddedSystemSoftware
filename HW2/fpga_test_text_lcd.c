@@ -11,9 +11,9 @@ Auth : largest@huins.com */
 #include <fcntl.h>
 #include "stdafx.h"
 
-/*#define MAX_BUFF 32
+#define MAX_BUFF 32
 #define LINE_BUFF 16
-#define FPGA_TEXT_LCD_DEVICE "/dev/fpga_text_lcd"*/
+#define FPGA_TEXT_LCD_DEVICE "/dev/fpga_text_lcd"
 
 int main(int argc, char **argv)
 {
