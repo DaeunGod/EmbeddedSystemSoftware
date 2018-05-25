@@ -1,7 +1,7 @@
 #Makefile for a basic kernel module
 
-obj-m   += mymain.o
-mymain-objs += fpga_dot_driver.o fpga_fnd_driver.o fpga_led_driver.o main.o
+obj-m   := main.o
+#mymain-objs += fpga_dot_driver.o fpga_fnd_driver.o fpga_led_driver.o main.o
 
 KDIR    :=/work/achroimx_kernel
 PWD     :=$(shell pwd)
@@ -17,7 +17,7 @@ driver:
 #arm-none-linux-gnueabi-gcc -static -o $(APP) $(APP).c
 
 install:
-	cp -a main.ko /nfsroot
+	cp -a dev_driver.ko /nfsroot
 	cp -a $(APP) /nfsroot
 clean:
 	rm -rf *.ko
@@ -27,4 +27,4 @@ clean:
 	rm -rf Module.symvers
 	rm -rf modules.order
 	rm -rf .tmp*
-	rm -rf .fpga*
+	rm -rf .main*
