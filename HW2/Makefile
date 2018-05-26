@@ -5,7 +5,7 @@ obj-m   := dev_driver.o
 
 KDIR    :=/work/achroimx_kernel
 PWD     :=$(shell pwd)
-APP		:= fpga_test
+APP		:= app
 
 all: driver app 
 
