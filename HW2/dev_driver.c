@@ -70,9 +70,14 @@ int iom_fpga_release(struct inode *minode, struct file *mfile)
 // when write to fpga_dot device  ,call this function
 ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) 
 {
+  int fndIndex = (int)gdata[0];
+  int fndValue = (int)gdata[1];
+  char fndData[4]= {0};
+  fndData[fndIndex] = fndValue;
+
 	printk("%d %d\n", (int)gdata[0], (int)gdata[1]);
-	//fpga_dot_write(inode, gdata, length, off_what);
-	//fpga_fnd_write(inode, gdata, length, off_what); 
+	fpga_dot_write(inode, fpga_number[fndValue], length, off_what);
+	fpga_fnd_write(inode, fndData, length, off_what); 
 	//led_write(inode, gdata, length, off_what);
 	//return length;
 	return 0;
@@ -95,8 +100,10 @@ ssize_t fpga_dot_write(struct file *inode, const char *gdata, size_t length, lof
 	unsigned short int _s_value;
 	const char *tmp = gdata;
 
-	if (copy_from_user(&value, tmp, length))
-		return -EFAULT;
+  for(i=0; i<10; i++)
+    value[i] = gdata[i];
+	//if (copy_from_user(&value, tmp, length))
+		//return -EFAULT;
 
 	for(i=0;i<length;i++)
     {
@@ -129,13 +136,16 @@ ssize_t fpga_dot_read(struct file *inode, char *gdata, size_t length, loff_t *of
 
 ssize_t fpga_fnd_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) 
 {
-	//int i;
+	int i;
 	unsigned char value[4];
 	unsigned short int value_short = 0;
-	const char *tmp = gdata;
+	//const char *tmp = gdata;
 
-	if (copy_from_user(&value, tmp, 4))
-		return -EFAULT;
+
+  for(i=0; i<4; i++)
+    value[i] = gdata[i];
+	//if (copy_from_user(&value, tmp, 4))
+		//return -EFAULT;
 
     value_short = value[0] << 12 | value[1] << 8 |value[2] << 4 |value[3];
     outw(value_short,(unsigned int)iom_fpga_fnd_addr);
@@ -185,10 +195,13 @@ ssize_t led_write(struct file *inode, const char *gdata, size_t length, loff_t *
 {
 	unsigned char value;
 	unsigned short _s_value;
-	const char *tmp = gdata;
+	//const char *tmp = gdata;
+  //
 
-	if (copy_from_user(&value, tmp, 1))
-		return -EFAULT;
+  value = *gdata;
+
+	//if (copy_from_user(&value, tmp, 1))
+		//return -EFAULT;
 
     _s_value = (unsigned short)value;
     outw(_s_value, (unsigned int)iom_fpga_led_addr);
