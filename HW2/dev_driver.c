@@ -285,7 +285,7 @@ void kernel_timer_function(unsigned long timerout){
 
 	printk("timer data: %d\n", p_timer->count);
 	p_timer->count--;
-	if( !p_timer->count ){
+	if( p_timer->count <= 0 ){
 		init_user_dataNstring();
 		return ;
 	}

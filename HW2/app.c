@@ -12,15 +12,17 @@
 
 int main(int argc, char **argv){
 
-	int timeInterval=0;
-	int times=0;
-	int startIndex=0;
+	char timeInterval=0;
+	char times=0;
+	char startIndex=0;
 	int startValue=0;
 
 	int dev=0;
 	char data[4]={0};
 
-	int i=0;
+	int i = 0;
+	int ret = 0;
+	char mask = 0xFF;
 
 	if( argc != 4 ){
 		printf("please input the 3 parameters! [time interval] [times] [start option]\n");
@@ -50,10 +52,13 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 
-	data[0] = (char)startIndex;
-	data[1] = (char)startValue;
-	data[2] = (char)timeInterval;
-	data[3] = (char)times;
+	ret = syscall(376, startIndex, (char)startValue, timeInterval, times);
+
+	for(i=3; i>=0; i--){
+		data[i] = (char)(ret&mask);
+		ret = ret >> 8;
+		printf("input data: %d\n", data[i]);
+	}
 
 	write(dev, data, 4);
 
