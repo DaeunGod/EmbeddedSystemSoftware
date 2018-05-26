@@ -24,7 +24,7 @@ int main(int argc, char **argv){
 
 	if( argc != 4 ){
 		printf("please input the 3 parameters! [time interval] [times] [start option]\n");
-		printf("ex) ./fpga_test [1-100] [1-100] [0001-8000]\n");
+		printf("ex) ./app [1-100] [1-100] [0001-8000]\n");
 		return -1;	
 	}
 
@@ -52,6 +52,8 @@ int main(int argc, char **argv){
 
 	data[0] = (char)startIndex;
 	data[1] = (char)startValue;
+	data[2] = (char)timeInterval;
+	data[3] = (char)times;
 
 	write(dev, data, 4);
 
