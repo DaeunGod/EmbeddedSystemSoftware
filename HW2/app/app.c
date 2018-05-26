@@ -4,11 +4,12 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 
-#include "./fpga_dot_font.h"
-
 #define FPGA_DEVICE "/dev/dev_driver"
+
+#define IOCTL_FPGA _IOW(242, 0, char*)
 
 int main(int argc, char **argv){
 
@@ -60,7 +61,8 @@ int main(int argc, char **argv){
 		printf("input data: %d\n", data[i]);
 	}
 
-	write(dev, data, 4);
+	//write(dev, data, 4);
+	ioctl(dev, IOCTL_FPGA, data);
 
 	close(dev);
 	return 0;

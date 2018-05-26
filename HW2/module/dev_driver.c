@@ -21,6 +21,8 @@
 #define IOM_FPGA_MAJOR 242
 #define IOM_FPGA_NAME "dev_driver"
 
+#define IOCTL_FPGA _IOW(242, 0, char*)
+
 #define IOM_FND_ADDRESS 0x08000004
 #define IOM_FPGA_DOT_ADDRESS 0x08000210 // pysical address
 #define IOM_LED_ADDRESS 0x08000016 // pysical address
@@ -38,6 +40,7 @@ int iom_fpga_open(struct inode *minode, struct file *mfile) ;
 int iom_fpga_release(struct inode *minode, struct file *mfile); 
 ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) ;
 ssize_t iom_fpga_read(struct file *inode, char *gdata, size_t length, loff_t *off_what) ;
+long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param); 
 
 ssize_t fpga_dot_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) ;
 ssize_t fpga_dot_read(struct file *inode, char *gdata, size_t length, loff_t *off_what) ;
@@ -55,11 +58,13 @@ void fpga_construct_fullString(void);
 void fpga_update_string(void);
 void init_user_dataNstring(void);
 
+int dev_driver_usage = 0;
+
 struct file_operations iom_fpga_fops = {
 	.owner = THIS_MODULE,
 	.open = iom_fpga_open,
 	.write = iom_fpga_write,
-	.read = iom_fpga_read,
+	.unlocked_ioctl = iom_fpga_ioctl,
 	.release = iom_fpga_release,
 };
 
@@ -94,9 +99,9 @@ struct{
 // when fpga_dot device open ,call this function
 int iom_fpga_open(struct inode *minode, struct file *mfile) 
 {	
-	//if(fpga_dot_port_usage != 0) return -EBUSY;
+	if(dev_driver_usage != 0) return -EBUSY;
 
-	//fpga_dot_port_usage = 1;
+	dev_driver_usage = 1;
 
 
 	return 0;
@@ -105,7 +110,7 @@ int iom_fpga_open(struct inode *minode, struct file *mfile)
 // when fpga_dot device close ,call this function
 int iom_fpga_release(struct inode *minode, struct file *mfile) 
 {
-	//fpga_dot_port_usage = 0;
+	dev_driver_usage = 0;
 
 	return 0;
 }
@@ -127,8 +132,8 @@ ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, lof
 	strncpy(userString.str2, "ChoeDaeun", 9);
 	fpga_construct_fullString();
 
-	printk("%s\n", userString.str1);
-	printk("%d %d %d %d\n", (int)gdata[0], userData.fndValue, userData.timeInterval, userData.times);
+	//printk("%s\n", userString.str1);
+	//printk("%d %d %d %d\n", (int)gdata[0], userData.fndValue, userData.timeInterval, userData.times);
 
 	fpga_dot_write(inode, fpga_number[userData.fndValue], 10, off_what);
 	fpga_fnd_write(inode, userData.fndData, length, off_what); 
@@ -264,6 +269,36 @@ ssize_t fpga_text_lcd_write(struct file *inode, const char *gdata, size_t length
 	}
 
 	return length;
+}
+
+long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param){
+	char* gdata = (char*)ioctl_param;
+	
+	switch (ioctl_num){
+		case IOCTL_FPGA:
+			userData.inode = inode;
+  		userData.fndIndex = (int)gdata[0];
+  		userData.fndOriginValue = userData.fndValue = (int)gdata[1];
+			userData.ledValue = 1 << (8-userData.fndValue);
+			userData.timeInterval = (int)gdata[2];
+			userData.times = (int)gdata[3];
+			memset(userData.fndData, 0, sizeof(userData.fndData));
+  		userData.fndData[userData.fndIndex] = userData.fndValue;
+
+			userString.dir1 = userString.dir2 = userString.space1 = userString.space2 = 0;
+			strncpy(userString.str1, "20131612", 8);
+			strncpy(userString.str2, "ChoeDaeun", 9);
+			fpga_construct_fullString();
+
+			fpga_dot_write(inode, fpga_number[userData.fndValue], 10, 0);
+			fpga_fnd_write(inode, userData.fndData, 4, 0); 
+			led_write(inode, &(userData.ledValue), 1, 0);
+			fpga_text_lcd_write(inode, userString.fullString, MAX_BUFF, 0);
+			timer_write(inode, 0, 1, 0);
+			break;
+	}
+
+	return 0;
 }
 
 ssize_t timer_write(struct file *inode, const char *gdata, size_t length, loff_t* off_what){
