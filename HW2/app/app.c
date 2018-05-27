@@ -25,7 +25,7 @@ int main(int argc, char **argv){
 	int ret = 0;
 	char mask = 0xFF;
 
-	if( argc != 4 ){
+	if( argc != 4 || strlen(argv[3]) != 4){
 		printf("please input the 3 parameters! [time interval] [times] [start option]\n");
 		printf("ex) ./app [1-100] [1-100] [0001-8000]\n");
 		return -1;	
@@ -33,6 +33,16 @@ int main(int argc, char **argv){
 
 	timeInterval = atoi(argv[1]);
 	times = atoi(argv[2]);
+
+	if( timeInterval < 1 || timeInterval > 100 ){
+		printf("ex) ./app [1-100] [1-100] [0001-8000]\n");
+		return -1;	
+	}
+	if( times < 1 || times > 100 ){
+		printf("ex) ./app [1-100] [1-100] [0001-8000]\n");
+		return -1;	
+	}
+
 	for(i=0; i<strlen(argv[3]); i++){
 		if( argv[3][i] != '0' ){
 			startIndex = i;
@@ -45,6 +55,11 @@ int main(int argc, char **argv){
 		startValue /= 10;
 	}
 	startValue %= 10;
+
+	if( startValue < 1 || startValue > 8 ){
+		printf("ex) ./app [1-100] [1-100] [0001-8000]\n");
+		return -1;	
+	}
 
 	dev = open(FPGA_DEVICE, O_WRONLY);
 	if( dev < 0 ){
