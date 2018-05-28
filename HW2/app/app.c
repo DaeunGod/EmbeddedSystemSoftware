@@ -73,8 +73,11 @@ int main(int argc, char **argv){
 	for(i=3; i>=0; i--){
 		data[i] = (char)(ret&mask);
 		ret = ret >> 8;
-		printf("input data: %d\n", data[i]);
+		//printf("input data: %d\n", data[i]);
 	}
+
+	printf("time interval: %.1fs, times: %d, fndIndex: %d, fndValue: %d\n",
+			(float)timeInterval/10.0f, times, startIndex, startValue);
 
 	//write(dev, data, 4);
 	ioctl(dev, IOCTL_FPGA, data);
