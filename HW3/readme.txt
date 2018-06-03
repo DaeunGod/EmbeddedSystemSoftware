@@ -1,3 +1,4 @@
 device driver: dev_driver.ko
-device file: /dev/dev_driver
+device file: /dev/stopwatch
+application: app
 major number: 242

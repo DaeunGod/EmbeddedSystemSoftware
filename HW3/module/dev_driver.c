@@ -22,8 +22,6 @@
 #define IOM_FPGA_MAJOR 242
 #define IOM_FPGA_NAME "stopwatch"
 
-#define IOCTL_FPGA _IOW(242, 0, char*)
-
 #define IOM_FND_ADDRESS 0x08000004
 
 unsigned char *iom_fpga_fnd_addr;
@@ -31,12 +29,14 @@ unsigned char *iom_fpga_fnd_addr;
 int iom_fpga_open(struct inode *minode, struct file *mfile) ;
 int iom_fpga_release(struct inode *minode, struct file *mfile); 
 ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) ;
-long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param); 
 
 ssize_t fpga_fnd_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what);
 
-ssize_t timer_write(struct file *inode, const char *gdata, size_t length, loff_t* off_what);
+void timer_write(void);
+void exittimer_write(void);
+
 void kernel_timer_function(unsigned long timerout);
+void kernel_exit_timer_function(unsigned long timerout);
 
 irqreturn_t inter_HomeButton(int irq, void* dev_id, struct pt_regs* reg);
 irqreturn_t inter_BackButton(int irq, void* dev_id, struct pt_regs* reg);
@@ -52,13 +52,10 @@ int dev_driver_usage = 0;
 dev_t inter_dev;
 struct cdev inter_cdev;
 
-//int inter_major = 242;
-
 struct file_operations iom_fpga_fops = {
 	.owner = THIS_MODULE,
 	.open = iom_fpga_open,
 	.write = iom_fpga_write,
-	.unlocked_ioctl = iom_fpga_ioctl,
 	.release = iom_fpga_release,
 };
 
@@ -68,14 +65,16 @@ struct struct_timer{
 };
 
 struct struct_timer timerInfo;
+struct struct_timer exittimerInfo;
 
 struct {
 	struct file *inode;
 	int fndMinValue;
   int fndSecValue;
 	char fndData[4];
-	int timeInterval;
-	int times;
+	int isPaused;
+	int exitFlag;
+	int exitTime;
 }userData;
 
 // when fpga_dot device open ,call this function
@@ -102,7 +101,7 @@ int iom_fpga_open(struct inode *minode, struct file *mfile)
 
   gpio_direction_input(IMX_GPIO_NR(5,14));
   irq = gpio_to_irq(IMX_GPIO_NR(5,14));
-  ret = request_irq(irq, (void*)inter_VolumePButton, IRQF_TRIGGER_FALLING, "volume-down", 0);
+  ret = request_irq(irq, (void*)inter_VolumeMButton, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "volume-down", 0);
 
 
 	return 0;
@@ -125,19 +124,21 @@ int iom_fpga_release(struct inode *minode, struct file *mfile)
 ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) 
 {
 	userData.inode = inode;
-  //userData.fndIndex = (int)gdata[0];
-  //userData.fndOriginValue = userData.fndValue = (int)gdata[1];
   userData.fndMinValue = 0;
   userData.fndSecValue = 0;
-	userData.timeInterval = 10;
-	userData.times = 0;
+	userData.isPaused = 1;
+	userData.exitFlag = 0;
+	userData.exitTime = 0;
 	memset(userData.fndData, 0, sizeof(userData.fndData));
 
 	//printk("%s\n", userString.str1);
 	//printk("%d %d %d %d\n", (int)gdata[0], userData.fndValue, userData.timeInterval, userData.times);
 
 	fpga_fnd_write(inode, userData.fndData, length, off_what); 
-	timer_write(inode, 0, 1, off_what);
+	//timer_write(inode, 0, 1, off_what);
+
+	printk("Start!!!\n");
+	interruptible_sleep_on( &wq_write );
 
 	return 0;
 }
@@ -157,69 +158,89 @@ ssize_t fpga_fnd_write(struct file *inode, const char *gdata, size_t length, lof
 	return length;
 }
 
-long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param){
-	//char* gdata = (char*)ioctl_param;
-	
-	switch (ioctl_num){
-		case IOCTL_FPGA:
-			/*userData.inode = inode;
-  		userData.fndIndex = (int)gdata[0];
-  		userData.fndOriginValue = userData.fndValue = (int)gdata[1];
-			userData.ledValue = 1 << (8-userData.fndValue);
-			userData.timeInterval = (int)gdata[2];
-			userData.times = (int)gdata[3];
-			memset(userData.fndData, 0, sizeof(userData.fndData));
-  		userData.fndData[userData.fndIndex] = userData.fndValue;
-
-			userString.dir1 = userString.dir2 = userString.space1 = userString.space2 = 0;
-			strncpy(userString.str1, "20131612", 8);
-			strncpy(userString.str2, "ChoeDaeun", 9);
-			fpga_construct_fullString();
-
-			fpga_dot_write(inode, fpga_number[userData.fndValue], 10, 0);
-			fpga_fnd_write(inode, userData.fndData, 4, 0); 
-			led_write(inode, &(userData.ledValue), 1, 0);
-			fpga_text_lcd_write(inode, userString.fullString, MAX_BUFF, 0);
-			timer_write(inode, 0, 1, 0);*/
-			break;
-	}
-
-	return 0;
-}
-
-ssize_t timer_write(struct file *inode, const char *gdata, size_t length, loff_t* off_what){
-	timerInfo.count = userData.times;
-
+void timer_write(void){
 	del_timer_sync( &timerInfo.timer );
 
-	timerInfo.timer.expires = get_jiffies_64() + (userData.timeInterval * HZ/10);
+	timerInfo.timer.expires = get_jiffies_64() + (HZ);
 	timerInfo.timer.data = (unsigned long)&timerInfo;
 	timerInfo.timer.function = kernel_timer_function;
 
 	add_timer(&timerInfo.timer);
+}
 
-	return 1;
+void exittimer_write(void){
+	del_timer_sync( &exittimerInfo.timer );
+
+	exittimerInfo.timer.expires = get_jiffies_64() + (HZ);
+	exittimerInfo.timer.data = (unsigned long)&exittimerInfo;
+	exittimerInfo.timer.function = kernel_exit_timer_function;
+
+	add_timer(&exittimerInfo.timer);
+}
+
+void fpag_update_data(void){
+	struct file *inode = userData.inode;
+	userData.fndSecValue ++;
+	if( userData.fndSecValue > 60 ){
+		userData.fndMinValue++;
+		userData.fndSecValue = 0;
+		if( userData.fndMinValue > 23 )
+			userData.fndMinValue = 0;
+	}
+
+	memset(userData.fndData, 0, sizeof(userData.fndData));
+	userData.fndData[3] = userData.fndSecValue%10;
+	userData.fndData[2] = userData.fndSecValue/10;
+	userData.fndData[1] = userData.fndMinValue%10;
+	userData.fndData[0] = userData.fndMinValue/10;
+
+	fpga_fnd_write(inode, userData.fndData, 4, 0);
 }
 
 void kernel_timer_function(unsigned long timerout){
-	struct struct_timer *p_timer = (struct struct_timer*)timerout;
-
-	printk("timer data: %d\n", p_timer->count);
-	p_timer->count--;
-	if( p_timer->count <= 0 ){
+	if( userData.isPaused == true ){
 		return ;
 	}
-
-	timerInfo.timer.expires = get_jiffies_64() + (userData.timeInterval*HZ/10);
+	fpag_update_data();
+	timerInfo.timer.expires = get_jiffies_64() + (HZ);
 	timerInfo.timer.data = (unsigned long)&timerInfo;
 	timerInfo.timer.function = kernel_timer_function;
 
 	add_timer(&timerInfo.timer);
+}
+
+void kernel_exit_timer_function(unsigned long timerout){
+	if( userData.exitFlag == 0 )
+		return ;
+
+	userData.exitTime++;
+	printk("exit Time: %d\n", userData.exitTime);
+	if( userData.exitTime >= 3 ){
+
+  	userData.fndMinValue = 0;
+  	userData.fndSecValue = 0;
+		userData.isPaused = 1;
+		memset(userData.fndData, 0, sizeof(userData.fndData));
+		fpga_fnd_write(userData.inode, userData.fndData, 4, 0);
+
+		del_timer_sync(&timerInfo.timer);
+		__wake_up(&wq_write, 1, 1, NULL);
+		return ;
+	}
+	exittimerInfo.timer.expires = get_jiffies_64() + (HZ);
+	exittimerInfo.timer.data = (unsigned long)&exittimerInfo;
+	exittimerInfo.timer.function = kernel_exit_timer_function;
+
+	add_timer(&exittimerInfo.timer);
 }
 
 irqreturn_t inter_HomeButton(int irq, void* dev_id, struct pt_regs* reg){
 	printk(KERN_ALERT "Home button %x\n", gpio_get_value(IMX_GPIO_NR(1, 11)));
   
+	if( userData.isPaused == true ){
+		userData.isPaused = false;
+		timer_write();
+	}
   return IRQ_HANDLED;
 }
 
@@ -227,18 +248,38 @@ irqreturn_t inter_HomeButton(int irq, void* dev_id, struct pt_regs* reg){
 irqreturn_t inter_BackButton(int irq, void* dev_id, struct pt_regs* reg){
 	printk(KERN_ALERT "Back button %x\n", gpio_get_value(IMX_GPIO_NR(1, 12)));
 
+	userData.isPaused = 1;
   return IRQ_HANDLED;
 }
 
 irqreturn_t inter_VolumePButton(int irq, void* dev_id, struct pt_regs* reg){
 	printk(KERN_ALERT "V+ button %x\n", gpio_get_value(IMX_GPIO_NR(2, 15)));
 
+  userData.fndMinValue = 0;
+  userData.fndSecValue = 0;
+	userData.isPaused = 1;
+	memset(userData.fndData, 0, sizeof(userData.fndData));
+	fpga_fnd_write(userData.inode, userData.fndData, 4, 0);
+
   return IRQ_HANDLED;
 }
 
 irqreturn_t inter_VolumeMButton(int irq, void* dev_id, struct pt_regs* reg){
+	int input = (int)gpio_get_value(IMX_GPIO_NR(5,14));
 	printk(KERN_ALERT "V- button %x\n", gpio_get_value(IMX_GPIO_NR(5, 14)));
 
+	if( userData.exitFlag == 0 ){
+		if( input == 0 ){
+			userData.exitFlag = 1;
+			exittimer_write();
+		}
+	}
+	else{
+		if( input == 1 ){
+			userData.exitFlag = 0;
+			userData.exitTime = 0;
+		}
+	}
   return IRQ_HANDLED;
 }
 
@@ -251,7 +292,6 @@ int inter_register_cdev(void){
 		printk(KERN_WARNING"Can't get any major\n");
 		return error;
 	}
-
 
 	printk("init module, %s major number : %d\n", IOM_FPGA_NAME, IOM_FPGA_MAJOR);
 	cdev_init(&inter_cdev, &iom_fpga_fops);
@@ -269,13 +309,6 @@ int inter_register_cdev(void){
 int __init iom_fpga_init(void)
 {
 	int result;
-
-	/*result = register_chrdev(IOM_FPGA_MAJOR, IOM_FPGA_NAME, &iom_fpga_fops);
-	if(result < 0) {
-		printk(KERN_WARNING"Can't get any major\n");
-		return result;
-	}*/
-
 	if( (result = inter_register_cdev()) < 0){
 		return result;
 	}
@@ -283,8 +316,7 @@ int __init iom_fpga_init(void)
 	iom_fpga_fnd_addr = ioremap(IOM_FND_ADDRESS, 0x4);
 
 	init_timer(&(timerInfo.timer));
-
-	printk("init module, %s major number : %d\n", IOM_FPGA_NAME, IOM_FPGA_MAJOR);
+	init_timer(&(exittimerInfo.timer));
 	
 	return 0;
 }
@@ -293,6 +325,7 @@ void __exit iom_fpga_exit(void)
 {
 	printk("exit module\n");
 	del_timer_sync(&timerInfo.timer);
+	del_timer_sync(&exittimerInfo.timer);
 	iounmap(iom_fpga_fnd_addr);
 	cdev_del(&inter_cdev);
 
