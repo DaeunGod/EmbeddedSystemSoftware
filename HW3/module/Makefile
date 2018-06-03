@@ -9,7 +9,7 @@ PWD     :=$(shell pwd)
 all: driver 
 
 driver:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules ARCH=arm
+	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
 install:
 	cp -a dev_driver.ko /nfsroot

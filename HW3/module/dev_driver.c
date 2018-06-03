@@ -11,13 +11,13 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/init.h>
 #include <linux/version.h>
 #include <linux/cdev.h>
 #include <linux/wait.h>
 #include <asm/irq.h>
+#include <mach/gpio.h>
+#include <asm/gpio.h>
+#include <linux/interrupt.h>
 
 #define IOM_FPGA_MAJOR 242
 #define IOM_FPGA_NAME "stopwatch"
@@ -26,16 +26,14 @@
 
 #define IOM_FND_ADDRESS 0x08000004
 
-static unsigned char *iom_fpga_fnd_addr;
+unsigned char *iom_fpga_fnd_addr;
 
 int iom_fpga_open(struct inode *minode, struct file *mfile) ;
 int iom_fpga_release(struct inode *minode, struct file *mfile); 
 ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what) ;
-ssize_t iom_fpga_read(struct file *inode, char *gdata, size_t length, loff_t *off_what) ;
 long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param); 
 
 ssize_t fpga_fnd_write(struct file *inode, const char *gdata, size_t length, loff_t *off_what);
-ssize_t fpga_fnd_read(struct file *inode, char *gdata, size_t length, loff_t *off_what); 
 
 ssize_t timer_write(struct file *inode, const char *gdata, size_t length, loff_t* off_what);
 void kernel_timer_function(unsigned long timerout);
@@ -45,10 +43,16 @@ irqreturn_t inter_BackButton(int irq, void* dev_id, struct pt_regs* reg);
 irqreturn_t inter_VolumePButton(int irq, void* dev_id, struct pt_regs* reg);
 irqreturn_t inter_VolumeMButton(int irq, void* dev_id, struct pt_regs* reg);
 
+int inter_register_cdev(void);
+
 wait_queue_head_t wq_write;
 DECLARE_WAIT_QUEUE_HEAD(wq_write);
 
 int dev_driver_usage = 0;
+dev_t inter_dev;
+struct cdev inter_cdev;
+
+//int inter_major = 242;
 
 struct file_operations iom_fpga_fops = {
 	.owner = THIS_MODULE,
@@ -81,28 +85,24 @@ int iom_fpga_open(struct inode *minode, struct file *mfile)
 	if(dev_driver_usage != 0) return -EBUSY;
   dev_driver_usage = 1;
 
-//irqreturn_t inter_HomeButton(int irq, void* dev_id, struct pt_regs* reg);
-//irqreturn_t inter_BackButton(int irq, void* dev_id, struct pt_regs* reg);
-//irqreturn_t inter_VolumePButton(int irq, void* dev_id, struct pt_regs* reg);
-//irqreturn_t inter_VolumeMButton(int irq, void* dev_id, struct pt_regs* reg);
   gpio_direction_input(IMX_GPIO_NR(1,11));
   irq = gpio_to_irq(IMX_GPIO_NR(1,11));
-  ret = request_irq(irq, inter_HomeButton, IRQG_TRIGGER_FALLING, "home", 0);
+  ret = request_irq(irq, (void*)inter_HomeButton, IRQF_TRIGGER_FALLING, "home", 0);
 
 
   gpio_direction_input(IMX_GPIO_NR(1,12));
   irq = gpio_to_irq(IMX_GPIO_NR(1,12));
-  ret = request_irq(irq, inter_BackButton, IRQG_TRIGGER_FALLING, "back", 0);
+  ret = request_irq(irq, (void*)inter_BackButton, IRQF_TRIGGER_FALLING, "back", 0);
 
 
   gpio_direction_input(IMX_GPIO_NR(2,15));
   irq = gpio_to_irq(IMX_GPIO_NR(2,15));
-  ret = request_irq(irq, inter_VolumePButton, IRQG_TRIGGER_FALLING, "volup", 0);
+  ret = request_irq(irq, (void*)inter_VolumePButton, IRQF_TRIGGER_FALLING, "volume-up", 0);
 
 
   gpio_direction_input(IMX_GPIO_NR(5,14));
   irq = gpio_to_irq(IMX_GPIO_NR(5,14));
-  ret = request_irq(irq, inter_VolumePButton, IRQG_TRIGGER_FALLING, "voldown", 0);
+  ret = request_irq(irq, (void*)inter_VolumePButton, IRQF_TRIGGER_FALLING, "volume-down", 0);
 
 
 	return 0;
@@ -113,10 +113,10 @@ int iom_fpga_release(struct inode *minode, struct file *mfile)
 {
 	dev_driver_usage = 0;
 
-  free_irq(gpio_to_irq(IMX_GPIO_NR(1,11), NULL);
-  free_irq(gpio_to_irq(IMX_GPIO_NR(1,12), NULL);
-  free_irq(gpio_to_irq(IMX_GPIO_NR(2,15), NULL);
-  free_irq(gpio_to_irq(IMX_GPIO_NR(5,14), NULL);
+  free_irq(gpio_to_irq(IMX_GPIO_NR(1,11)), NULL);
+  free_irq(gpio_to_irq(IMX_GPIO_NR(1,12)), NULL);
+  free_irq(gpio_to_irq(IMX_GPIO_NR(2,15)), NULL);
+  free_irq(gpio_to_irq(IMX_GPIO_NR(5,14)), NULL);
 
 	return 0;
 }
@@ -130,7 +130,7 @@ ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, lof
   userData.fndMinValue = 0;
   userData.fndSecValue = 0;
 	userData.timeInterval = 10;
-	userData.times = (int)gdata[3];
+	userData.times = 0;
 	memset(userData.fndData, 0, sizeof(userData.fndData));
 
 	//printk("%s\n", userString.str1);
@@ -139,16 +139,6 @@ ssize_t iom_fpga_write(struct file *inode, const char *gdata, size_t length, lof
 	fpga_fnd_write(inode, userData.fndData, length, off_what); 
 	timer_write(inode, 0, 1, off_what);
 
-	return 0;
-}
-
-ssize_t iom_fpga_read(struct file *inode, char *gdata, size_t length, loff_t *off_what) 
-{
-	fpga_dot_read(inode, gdata, length, off_what);
-	fpga_fnd_read(inode, gdata, length, off_what);
-	led_read(inode, gdata, length, off_what) ;	
-
-	//return length;
 	return 0;
 }
 
@@ -168,7 +158,7 @@ ssize_t fpga_fnd_write(struct file *inode, const char *gdata, size_t length, lof
 }
 
 long iom_fpga_ioctl(struct file *inode, unsigned int ioctl_num, unsigned long ioctl_param){
-	char* gdata = (char*)ioctl_param;
+	//char* gdata = (char*)ioctl_param;
 	
 	switch (ioctl_num){
 		case IOCTL_FPGA:
@@ -228,34 +218,65 @@ void kernel_timer_function(unsigned long timerout){
 }
 
 irqreturn_t inter_HomeButton(int irq, void* dev_id, struct pt_regs* reg){
-
+	printk(KERN_ALERT "Home button %x\n", gpio_get_value(IMX_GPIO_NR(1, 11)));
   
   return IRQ_HANDLED;
 }
 
 
 irqreturn_t inter_BackButton(int irq, void* dev_id, struct pt_regs* reg){
+	printk(KERN_ALERT "Back button %x\n", gpio_get_value(IMX_GPIO_NR(1, 12)));
 
   return IRQ_HANDLED;
 }
 
 irqreturn_t inter_VolumePButton(int irq, void* dev_id, struct pt_regs* reg){
+	printk(KERN_ALERT "V+ button %x\n", gpio_get_value(IMX_GPIO_NR(2, 15)));
 
   return IRQ_HANDLED;
 }
 
 irqreturn_t inter_VolumeMButton(int irq, void* dev_id, struct pt_regs* reg){
+	printk(KERN_ALERT "V- button %x\n", gpio_get_value(IMX_GPIO_NR(5, 14)));
 
   return IRQ_HANDLED;
+}
+
+int inter_register_cdev(void){
+	int error=0;
+	inter_dev = MKDEV(IOM_FPGA_MAJOR, 0);
+	error = register_chrdev_region(inter_dev, 1, "inter");
+
+	if( error < 0 ){
+		printk(KERN_WARNING"Can't get any major\n");
+		return error;
+	}
+
+
+	printk("init module, %s major number : %d\n", IOM_FPGA_NAME, IOM_FPGA_MAJOR);
+	cdev_init(&inter_cdev, &iom_fpga_fops);
+	inter_cdev.owner = THIS_MODULE;
+	inter_cdev.ops = &iom_fpga_fops;
+
+	error = cdev_add(&inter_cdev, inter_dev, 1);
+
+	if( error )
+		printk(KERN_NOTICE "inter Register Error %d\n", error);
+
+	return 0;
 }
 
 int __init iom_fpga_init(void)
 {
 	int result;
 
-	result = register_chrdev(IOM_FPGA_MAJOR, IOM_FPGA_NAME, &iom_fpga_fops);
+	/*result = register_chrdev(IOM_FPGA_MAJOR, IOM_FPGA_NAME, &iom_fpga_fops);
 	if(result < 0) {
 		printk(KERN_WARNING"Can't get any major\n");
+		return result;
+	}*/
+
+	if( (result = inter_register_cdev()) < 0){
 		return result;
 	}
 
@@ -273,8 +294,10 @@ void __exit iom_fpga_exit(void)
 	printk("exit module\n");
 	del_timer_sync(&timerInfo.timer);
 	iounmap(iom_fpga_fnd_addr);
+	cdev_del(&inter_cdev);
 
-	unregister_chrdev(IOM_FPGA_MAJOR, IOM_FPGA_NAME);
+	unregister_chrdev_region(inter_dev, 1);
+	//unregister_chrdev(IOM_FPGA_MAJOR, IOM_FPGA_NAME);
 }
 
 module_init(iom_fpga_init);
