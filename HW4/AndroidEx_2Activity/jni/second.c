@@ -1,23 +1,33 @@
 #include <jni.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
 #include "android/log.h"
 
 #define LOG_TAG "MyTag"
 #define LOGV(...)   __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
 
-extern int first(int x,int y);
+#define FPGA_DEVICE "/dev/dev_driver"
 
-jint JNICALL Java_org_example_ndk_NDKExam_add(JNIEnv *env, jobject this, jint x, jint y)
+jint JNICALL Java_com_example_androidex_FpgaControl_open(JNIEnv *env, jobject this)
 {
-	LOGV("log test %d", 1234);
-	return first(x, y);
+	int dev = open(FPGA_DEVICE, O_RDWR);
+	//if( dev < 0 ){
+	//	perror("device file error");
+	//	return -1;
+	//}
+
+	return dev;
 }
 
-void JNICALL Java_org_example_ndk_NDKExam_testString(JNIEnv *env, jobject this, jstring string)
+void JNICALL Java_com_example_androidex_FpgaControl_close(JNIEnv *env, jobject this, jint fd)
 {
-	const char *str=(*env)->GetStringUTFChars( env, string, 0);
-	jint len = (*env)->GetStringUTFLength( env, string );
-	LOGV("native testString len %d", len);
-	LOGV("native testString %s", str);
-	
-	(*env)->ReleaseStringUTFChars( env, string, str );	
+	close(fd);
+}
+
+void JNICALL Java_com_example_androidex_FpgaControl_write(JNIEnv *env, jobject this, jint fd, jint value)
+{
+	char _value[4] = {0};
+	sprintf(_value, "%d", value);
+	write(fd, _value, 4);
 }
