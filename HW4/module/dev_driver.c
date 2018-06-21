@@ -67,7 +67,6 @@ struct struct_timer{
 };
 
 struct struct_timer timerInfo;
-struct struct_timer exittimerInfo;
 
 struct {
 	struct file *inode;
@@ -79,8 +78,6 @@ struct {
 	int isDone;
 	char storedFndData[4];
 }userData;
-
-int isDone(void){ return userData.isDone; }
 
 // when fpga_dot device open ,call this function
 int iom_fpga_open(struct inode *minode, struct file *mfile) 
@@ -105,6 +102,7 @@ int iom_fpga_open(struct inode *minode, struct file *mfile)
 	userData.mode = 0;
 	userData.timerTime = 0;
 	userData.isDone = 0;
+	userData.isTimerPause = 1;
 	return 0;
 }
 
@@ -212,17 +210,19 @@ irqreturn_t inter_VolumePButton(int irq, void* dev_id, struct pt_regs* reg){
 	char fnd[4] = {0};
 	int time = 0;
 	printk(KERN_ALERT "V+ button %x\n", gpio_get_value(IMX_GPIO_NR(2, 15)));
+	
+	if( userData.mode == 1 ){
+		if( userData.isTimerPause == 1 ){
+			userData.timerTime++;
+			if( userData.timerTime > 60 )
+				userData.timerTime = 0;
 
-	if( userData.isTimerPause == 1 ){
-		userData.timerTime++;
-		if( userData.timerTime > 60 )
-			userData.timerTime = 0;
-
-		time = userData.timerTime;
-		fnd[3] = time%10;
-		time = time/10;
-		fnd[2] = time%10;
-		fpga_fnd_write(userData.inode, fnd, 4, 0);
+			time = userData.timerTime;
+			fnd[3] = time%10;
+			time = time/10;
+			fnd[2] = time%10;
+			fpga_fnd_write(userData.inode, fnd, 4, 0);
+		}
 	}
 
   return IRQ_HANDLED;
@@ -232,10 +232,12 @@ irqreturn_t inter_VolumeMButton(int irq, void* dev_id, struct pt_regs* reg){
 	//int input = (int)gpio_get_value(IMX_GPIO_NR(5,14));
 	printk(KERN_ALERT "V- button %x\n", gpio_get_value(IMX_GPIO_NR(5, 14)));
 
-	if( userData.isTimerPause == 1 ){
-		userData.isTimerPause = 0;
+	if( userData.mode == 1){
+		if( userData.isTimerPause == 1 ){
+			userData.isTimerPause = 0;
 
-		timer_write();
+			timer_write();
+		}
 	}
   return IRQ_HANDLED;
 }
@@ -326,7 +328,6 @@ int __init iom_fpga_init(void)
 	iom_fpga_dot_addr = ioremap(IOM_DOT_ADDRESS, 0x10);
 
 	init_timer(&(timerInfo.timer));
-	init_timer(&(exittimerInfo.timer));
 	
 	return 0;
 }
@@ -335,7 +336,6 @@ void __exit iom_fpga_exit(void)
 {
 	printk("exit module\n");
 	del_timer_sync(&timerInfo.timer);
-	del_timer_sync(&exittimerInfo.timer);
 	iounmap(iom_fpga_fnd_addr);
 	iounmap(iom_fpga_dot_addr);
 	cdev_del(&inter_cdev);
