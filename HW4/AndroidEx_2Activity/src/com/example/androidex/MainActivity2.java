@@ -7,6 +7,8 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
@@ -20,21 +22,58 @@ import android.widget.TextView;
 
 
 public class MainActivity2 extends Activity implements View.OnClickListener{
+	
+	
+	
 	private static final String TAG = "tag";
 	LinearLayout linear;
-	EditText data;
-	Button btn;
-	OnClickListener ltn;
+	//EditText data;
+	//Button btn;
+	//OnClickListener ltn;
 	static int row = 0;
 	static int col = 0;
 	int widthPixel;
 	int heightPixel;
+	boolean isDone;
 	MainActivity2 mainActiviy;;
 	DisplayMetrics dm;
 	
 	int[] numberList;
 	
 	FpgaControl fpgaControl;
+	BackThread mThread;
+	
+	Handler mHandler=new Handler(){
+		public void handleMessage(Message msg){
+			if(msg.what==0){
+				//Log.v(TAG, String.valueOf(msg.arg1));
+				//mBackText.setText("BackValue : "+msg.arg1);
+				if( msg.arg1 == 1 ){
+					AlertDialog dlg = null;
+					AlertDialog.Builder dialog = new AlertDialog.Builder(mainActiviy);
+					
+					dialog.setMessage("Time Out!")
+						.setTitle("20131612")
+						.setPositiveButton("ok", new DialogInterface.OnClickListener() {
+							
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								// TODO Auto-generated method stub
+								mainActiviy.finish();
+								dialog.dismiss();
+							}
+						})
+						.setCancelable(false);
+						
+					dlg = dialog.create();
+					dlg.show();
+					row = col = 0;
+					fpgaControl.finalize();
+					fpgaControl = null;
+				}
+			}
+		}
+	};
 	
 	public static boolean isStringInt(String s){
 		try{
@@ -54,18 +93,19 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 		mainActiviy = this;
 		dm = getApplicationContext().getResources().getDisplayMetrics();
 		fpgaControl = new FpgaControl();
+		isDone = false;
 		
 		
 		linear = (LinearLayout)findViewById(R.id.container);
-		data=(EditText)findViewById(R.id.editText1);
+		
 		Button btn=(Button)findViewById(R.id.button1);
 		
 		widthPixel = dm.widthPixels;
 		heightPixel = dm.heightPixels - 150;
 		
-		ltn=new OnClickListener(){
+		OnClickListener ltn=new OnClickListener(){
 			public void onClick(View v){
-				
+				EditText data=(EditText)findViewById(R.id.editText1);
 				
 				String temp=data.getText().toString();
 				String[] parseStr = temp.split(" ");
@@ -79,7 +119,7 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 
 				row = Integer.parseInt(parseStr[0]);
 				col = Integer.parseInt(parseStr[1]);
-				if( row < 2 || col < 1 || row > 4 || col > 4){
+				if( row < 2 || col < 2 || row > 4 || col > 4){
 					row = col = 0;
 					return ;
 				}
@@ -91,6 +131,11 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 		};
 		
 		btn.setOnClickListener(ltn);
+		
+		mThread=new BackThread(mHandler);
+		mThread.setDaemon(true);
+		mThread.setFd(fpgaControl.getFd());
+		mThread.start();
 	}
 	
 	
@@ -160,24 +205,28 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 			if( numberList[(_row-1)*col + _col] == 0 ){
 				numberList[(_row-1)*col + _col] = buttonNumber;
 				numberList[_row*col + _col] = 0;
+				fpgaControl.increaseCount();
 			}
 		}
 		if( _row+1 < row ){
 			if( numberList[(_row+1)*col + _col] == 0 ){
 				numberList[(_row+1)*col + _col] = buttonNumber;
 				numberList[_row*col + _col] = 0;
+				fpgaControl.increaseCount();
 			}
 		}
 		if( _col-1 >= 0){
 			if( numberList[(_row)*col + _col-1] == 0 ){
 				numberList[(_row)*col + _col-1] = buttonNumber;
 				numberList[_row*col + _col] = 0;
+				fpgaControl.increaseCount();
 			}
 		}
 		if( _col+1 < col){
 			if( numberList[(_row)*col + _col+1] == 0 ){
 				numberList[(_row)*col + _col+1] = buttonNumber;
 				numberList[_row*col + _col] = 0;
+				fpgaControl.increaseCount();
 			}
 		}
 		
@@ -185,7 +234,7 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 		clearButtons();
 		makeButtons();
 		
-		fpgaControl.increaseCount();
+		
 		
 		checkAnswer();
 	}
@@ -235,6 +284,7 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 		}
 		
 		if( check ){
+			isDone = check;
 			AlertDialog dlg = null;
 			AlertDialog.Builder dialog = new AlertDialog.Builder(this);
 			
@@ -254,6 +304,37 @@ public class MainActivity2 extends Activity implements View.OnClickListener{
 			dlg = dialog.create();
 			dlg.show();
 			row = col = 0;
+			fpgaControl.finalize();
+			fpgaControl = null;
+		}
+	}
+	
+	/*protected void onDestroy(){
+		super.onDestroy();
+		Log.v(TAG, "Destory");
+	}*/
+	
+	class BackThread extends Thread{
+		public native int isDone(int fd);
+		Handler sHandler;
+		int fd;
+		
+		BackThread(Handler handler){
+			sHandler=handler;
+		}
+		public void run(){
+			while(true){
+				Message msg=Message.obtain();
+				msg.what=0;
+				msg.arg1=isDone(fd);
+				sHandler.sendMessage(msg);
+				if( msg.arg1 == 1 || isDone )
+					break;
+				try{Thread.sleep(100);}catch(InterruptedException e){;}
+			}
+		}
+		public void setFd(int fd){
+			this.fd = fd;
 		}
 	}
 }
@@ -266,11 +347,17 @@ class FpgaControl{
 	int fd;
 	int count;
 	
+	public int getFd(){
+		return fd;
+	}
+	
 	public FpgaControl(){
 		System.loadLibrary("ndk-exam");
 		fd = open();
 		Log.v("tag", String.valueOf(fd));
 		count = 0;
+		write(fd, count);
+		Log.v("tag", "FPGA_CONTROL_OPEN");
 	}
 	
 	public void increaseCount(){
@@ -280,6 +367,7 @@ class FpgaControl{
 	
 	@Override
 	protected void finalize(){
+		Log.v("tag", "FPGA_CONTROL_DIE");
 		close(fd);
 	}
 }
