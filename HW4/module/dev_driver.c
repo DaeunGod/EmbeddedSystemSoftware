@@ -109,11 +109,15 @@ int iom_fpga_open(struct inode *minode, struct file *mfile)
 // when fpga_dot device close ,call this function
 int iom_fpga_release(struct inode *minode, struct file *mfile) 
 {
+	char fnd[4]={0};
 	dev_driver_usage = 0;
 
   free_irq(gpio_to_irq(IMX_GPIO_NR(1,11)), NULL);
   free_irq(gpio_to_irq(IMX_GPIO_NR(2,15)), NULL);
   free_irq(gpio_to_irq(IMX_GPIO_NR(5,14)), NULL);
+
+ 	fpga_dot_write(userData.inode, fpga_set_blank, 10, 0);
+	fpga_fnd_write(userData.inode, fnd, 4, 0);
 
 	return 0;
 }
